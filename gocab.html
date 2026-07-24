@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoCab Premium — Управление договорами</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ===== ГЛОБАЛЬНЫЕ СТИЛИ ===== */
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: #070a0f;
+      color: #eef2f7;
+      font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+      display: flex;
+      min-height: 100vh;
+      overflow: hidden;
+      line-height: 1.5;
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #111a24; }
+    ::-webkit-scrollbar-thumb { background: linear-gradient(180deg, #2f8cf0, #a855f7); border-radius: 10px; }
+
+    /* ===== ПРЕЛОАДЕР ===== */
+    #preloader {
+      position: fixed;
+      inset: 0;
+      background: #070a0f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.8s ease;
+    }
+    #preloader.hide {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .loader {
+      width: 60px;
+      height: 60px;
+      border: 4px solid #1e2a38;
+      border-top: 4px solid #2f8cf0;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      box-shadow: 0 0 30px rgba(47, 140, 240, 0.2);
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    /* ===== SIDEBAR ===== */
+    .sidebar {
+      width: 220px;
+      background: rgba(17, 26, 36, 0.85);
+      backdrop-filter: blur(14px);
+      border-right: 1px solid rgba(47, 140, 240, 0.12);
+      padding: 24px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      flex-shrink: 0;
+      overflow-y: auto;
+      transition: width 0.3s;
+    }
+    .sidebar .logo {
+      font-size: 24px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #2f8cf0, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-align: center;
+      padding: 12px 0 24px;
+      letter-spacing: -0.5px;
+      position: relative;
+    }
+    .sidebar .logo::after {
+      content: '';
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #2f8cf0, transparent);
+    }
+    .sidebar button {
+      background: transparent;
+      border: none;
+      color: #8a9bb5;
+      padding: 11px 16px;
+      text-align: left;
+      font-size: 14px;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-weight: 500;
+      position: relative;
+    }
+    .sidebar button:hover {
+      background: rgba(47, 140, 240, 0.08);
+      color: #fff;
+      transform: translateX(4px);
+    }
+    .sidebar button.active {
+      background: rgba(47, 140, 240, 0.15);
+      color: #2f8cf0;
+      box-shadow: inset 3px 0 0 #2f8cf0;
+    }
+    .sidebar button i {
+      width: 20px;
+      font-size: 16px;
+      text-align: center;
+      transition: transform 0.3s;
+    }
+    .sidebar button:hover i { transform: scale(1.1); }
+    .sidebar button span { white-space: nowrap; }
+
+    /* ===== MAIN ===== */
+    .main {
+      flex: 1;
+      padding: 28px 32px;
+      overflow-y: auto;
+      height: 100vh;
+      background: radial-gradient(ellipse at 20% 30%, #111e2c 0%, #070a0f 70%);
+    }
+    .page {
+      display: none;
+      animation: fadeSlideUp 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .page.active { display: block; }
+    @keyframes fadeSlideUp {
+      0% { opacity: 0; transform: translateY(20px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      letter-spacing: -0.3px;
+    }
+    h1 i {
+      color: #2f8cf0;
+      filter: drop-shadow(0 0 8px rgba(47, 140, 240, 0.3));
+    }
+
+    /* ===== КАРТОЧКИ ===== */
+    .card {
+      background: rgba(19, 28, 40, 0.6);
+      backdrop-filter: blur(8px);
+      border-radius: 20px;
+      padding: 22px 26px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(47, 140, 240, 0.08);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #2f8cf0, transparent);
+      opacity: 0;
+      transition: opacity 0.4s;
+    }
+    .card:hover::before { opacity: 1; }
+    .card:hover {
+      border-color: rgba(47, 140, 240, 0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #c8d6e5;
+    }
+    .card-title i { color: #2f8cf0; }
+
+    /* ===== СТАТИСТИКА ===== */
+    .row-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: rgba(13, 20, 30, 0.6);
+      backdrop-filter: blur(4px);
+      border-radius: 16px;
+      padding: 16px 20px;
+      border-left: 4px solid #2f8cf0;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: default;
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(47, 140, 240, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      border-left-color: #a855f7;
+    }
+    .stat-card .label {
+      font-size: 12px;
+      color: #8a9bb5;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+    }
+    .stat-card .value {
+      font-size: 30px;
+      font-weight: 700;
+      margin-top: 4px;
+      letter-spacing: -0.5px;
+      transition: color 0.3s;
+    }
+    .stat-card .sub {
+      font-size: 12px;
+      color: #6a7f9a;
+      margin-top: 2px;
+    }
+    .stat-card.positive .value { color: #10b981; }
+    .stat-card.negative .value { color: #ef4444; }
+    .stat-card.goal .value { color: #f59e0b; }
+
+    /* ===== ФОРМЫ ===== */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 14px 18px;
+      align-items: end;
+    }
+    .form-grid label {
+      font-size: 12px;
+      font-weight: 500;
+      color: #a0b8d0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .form-grid input, .form-grid select, .form-grid textarea {
+      background: rgba(10, 14, 20, 0.8);
+      border: 1px solid #1e2a38;
+      color: #e8edf5;
+      padding: 9px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      outline: none;
+      transition: all 0.3s;
+      width: 100%;
+      font-family: inherit;
+    }
+    .form-grid input:focus, .form-grid select:focus, .form-grid textarea:focus {
+      border-color: #2f8cf0;
+      box-shadow: 0 0 0 3px rgba(47, 140, 240, 0.15);
+      background: rgba(10, 14, 20, 0.95);
+    }
+    .form-grid textarea { resize: vertical; min-height: 60px; }
+
+    /* ===== КНОПКИ ===== */
+    .btn {
+      background: linear-gradient(135deg, #2f8cf0, #1a6dd4);
+      border: none;
+      color: #fff;
+      padding: 9px 24px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 16px rgba(47, 140, 240, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+    .btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .btn:hover::after { opacity: 1; }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(47, 140, 240, 0.35);
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn-secondary {
+      background: #1e2a38;
+      box-shadow: none;
+    }
+    .btn-secondary:hover { background: #2a3a4e; }
+    .btn-success {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.25);
+    }
+    .btn-success:hover { box-shadow: 0 8px 24px rgba(16, 185, 129, 0.35); }
+    .btn-danger {
+      background: linear-gradient(135deg, #ef4444, #dc2626);
+      box-shadow: 0 4px 16px rgba(239, 68, 68, 0.25);
+    }
+    .btn-danger:hover { box-shadow: 0 8px 24px rgba(239, 68, 68, 0.35); }
+    .btn-sm { padding: 5px 14px; font-size: 12px; }
+    .flex { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .mt-10 { margin-top: 10px; }
+    .text-muted { color: #6a7f9a; font-size: 12px; }
+
+    /* ===== ТАБЛИЦЫ ===== */
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 10px;
+      border-radius: 12px;
+      background: rgba(10, 14, 20, 0.4);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      text-align: left;
+      padding: 12px 12px;
+      color: #8a9bb5;
+      border-bottom: 2px solid #1a2430;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid #18222e;
+      vertical-align: middle;
+    }
+    tr:hover td { background: rgba(47, 140, 240, 0.04); }
+    .badge {
+      padding: 3px 14px;
+      border-radius: 30px;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-block;
+      transition: all 0.3s;
+    }
+    .badge.active { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+    .badge.inactive { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .badge.pending { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+    /* ===== ЧАТ ===== */
+    .chat-container {
+      background: rgba(10, 14, 20, 0.6);
+      border-radius: 16px;
+      padding: 16px;
+      max-height: 280px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      border: 1px solid #1a2430;
+      margin-bottom: 12px;
+    }
+    .chat-msg {
+      padding: 8px 18px;
+      border-radius: 18px;
+      max-width: 85%;
+      line-height: 1.5;
+      font-size: 14px;
+      animation: fadeSlideUp 0.3s;
+    }
+    .chat-msg.user {
+      background: linear-gradient(135deg, #2f8cf0, #1a6dd4);
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 2px 12px rgba(47, 140, 240, 0.2);
+    }
+    .chat-msg.ai {
+      background: #18222e;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+      color: #d0dcec;
+      border: 1px solid #1e2a38;
+    }
+    .chat-msg.ai strong { color: #8bb8f0; }
+    .chat-input-row {
+      display: flex;
+      gap: 12px;
+    }
+    .chat-input-row input {
+      flex: 1;
+      background: rgba(10, 14, 20, 0.8);
+      border: 1px solid #1a2430;
+      color: #e8edf5;
+      padding: 12px 18px;
+      border-radius: 14px;
+      font-size: 14px;
+      outline: none;
+      transition: all 0.3s;
+    }
+    .chat-input-row input:focus { border-color: #2f8cf0; }
+
+    /* ===== ГРАФИК ПЛАТЕЖЕЙ ===== */
+    .schedule-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .schedule-item {
+      background: rgba(10, 14, 20, 0.6);
+      border-radius: 10px;
+      padding: 8px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid #1a2430;
+      transition: all 0.3s;
+    }
+    .schedule-item:hover { border-color: #2f8cf0; }
+    .schedule-item .date { font-size: 11px; color: #8a9bb5; }
+    .schedule-item .amount { font-weight: 600; }
+    .schedule-item .status-badge {
+      font-size: 10px;
+      padding: 2px 10px;
+      border-radius: 20px;
+    }
+    .schedule-item .status-badge.paid { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+    .schedule-item .status-badge.unpaid { background: rgba(245, 158, 11, 0.2); color: #f59e0b; }
+
+    /* ===== МОДАЛКА ===== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(10px);
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      animation: fadeIn 0.3s;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #131c26;
+      border-radius: 24px;
+      padding: 30px 35px;
+      max-width: 520px;
+      width: 90%;
+      border: 1px solid rgba(47, 140, 240, 0.15);
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+      animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    @keyframes scaleIn { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .modal h2 {
+      margin-bottom: 20px;
+      font-size: 22px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .modal .form-grid { grid-template-columns: 1fr; }
+
+    /* ===== ТОСТЫ ===== */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 9999;
+    }
+    .toast {
+      padding: 14px 22px;
+      border-radius: 14px;
+      background: #1a2430;
+      border-left: 5px solid #2f8cf0;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      animation: slideInRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      color: #e8edf5;
+      font-size: 14px;
+      min-width: 220px;
+      backdrop-filter: blur(8px);
+    }
+    .toast.success { border-left-color: #10b981; }
+    .toast.error { border-left-color: #ef4444; }
+    @keyframes slideInRight {
+      0% { opacity: 0; transform: translateX(40px); }
+      100% { opacity: 1; transform: translateX(0); }
+    }
+
+    /* ===== АДАПТИВ ===== */
+    @media (max-width: 768px) {
+      .sidebar { width: 64px; padding: 16px 6px; }
+      .sidebar .logo { font-size: 18px; }
+      .sidebar button span { display: none; }
+      .sidebar button i { font-size: 18px; margin: 0; }
+      .main { padding: 16px; }
+      .row-stats { grid-template-columns: 1fr 1fr; }
+      .stat-card .value { font-size: 24px; }
+    }
+    @media (max-width: 480px) {
+      .sidebar { width: 52px; padding: 10px 4px; }
+      .row-stats { grid-template-columns: 1fr; }
+      .modal { padding: 20px; }
+    }
+
+    /* Анимация пульсации для важных чисел */
+    @keyframes pulseGlow {
+      0% { text-shadow: 0 0 10px rgba(47, 140, 240, 0); }
+      50% { text-shadow: 0 0 20px rgba(47, 140, 240, 0.2); }
+      100% { text-shadow: 0 0 10px rgba(47, 140, 240, 0); }
+    }
+    .value-glow {
+      animation: pulseGlow 3s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ПРЕЛОАДЕР -->
+  <div id="preloader"><div class="loader"></div></div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="logo"><i class="fas fa-rocket"></i> GoCab</div>
+    <button class="active" data-page="dashboard"><i class="fas fa-chart-pie"></i><span>Дашборд</span></button>
+    <button data-page="clients"><i class="fas fa-users"></i><span>Клиенты</span></button>
+    <button data-page="fleet"><i class="fas fa-car"></i><span>Машины</span></button>
+    <button data-page="payments"><i class="fas fa-coins"></i><span>Платежи</span></button>
+    <button data-page="credits"><i class="fas fa-hand-holding-usd"></i><span>Договоры</span></button>
+    <button data-page="scenario"><i class="fas fa-sliders-h"></i><span>Сценарии</span></button>
+    <button data-page="analytics"><i class="fas fa-chart-line"></i><span>Аналитика</span></button>
+    <button data-page="assistant"><i class="fas fa-robot"></i><span>AI-чат</span></button>
+    <button data-page="settings"><i class="fas fa-cog"></i><span>Настройки</span></button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <h1><i class="fas fa-chart-pie"></i> Дашборд</h1>
+      <div class="row-stats" id="dash-stats"></div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-calendar-alt"></i> Прибыль по месяцам</div>
+        <canvas id="profitChart" height="120"></canvas>
+      </div>
+    </div>
+
+    <!-- CLIENTS -->
+    <div id="page-clients" class="page">
+      <h1><i class="fas fa-users"></i> Клиенты</h1>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-user-plus"></i> Регистрация</div>
+        <div class="form-grid">
+          <label>ФИО <input id="c-name" placeholder="Иван Петров"></label>
+          <label>Телефон <input id="c-phone" placeholder="+7 900 123 45 67"></label>
+          <label>Telegram ID <input id="c-tg" placeholder="@ivanpetrov"></label>
+          <label>Тип <select id="c-type"><option value="driver">Водитель</option><option value="buyer">Покупатель</option></select></label>
+        </div>
+        <button class="btn mt-10" id="add-client-btn"><i class="fas fa-user-plus"></i> Зарегистрировать</button>
+        <button class="btn btn-secondary mt-10" id="import-clients-csv"><i class="fas fa-file-csv"></i> Загрузить CSV</button>
+        <input type="file" id="client-csv-file" accept=".csv" style="display:none;">
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-list"></i> Список клиентов</div>
+        <div class="search-box"><input id="client-search" placeholder="🔍 Поиск..." style="background:rgba(10,14,20,0.8);border:1px solid #1a2430;color:#e8edf5;padding:8px 14px;border-radius:10px;width:100%;max-width:300px;outline:none;font-size:13px;"></div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Имя</th><th>Телефон</th><th>Telegram</th><th>Тип</th><th>Долг</th><th>Оплачено</th><th>Действия</th></tr></thead>
+          <tbody id="client-table-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- FLEET -->
+    <div id="page-fleet" class="page">
+      <h1><i class="fas fa-car"></i> Машины</h1>
+      <div class="row-stats" id="fleet-stats"></div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-plus-circle"></i> Добавить машины (массово)</div>
+        <div class="form-grid">
+          <label>Модель <input id="f-model-bulk" placeholder="Toyota Camry"></label>
+          <label>Количество <input id="f-count-bulk" type="number" placeholder="5"></label>
+          <label style="grid-column:1/-1;">Цена покупки ($) <input id="f-price-bulk" type="number" placeholder="22000"></label>
+        </div>
+        <button class="btn mt-10" id="add-fleet-bulk-count-btn"><i class="fas fa-upload"></i> Добавить N штук</button>
+        <button class="btn btn-secondary" id="add-fleet-single-btn"><i class="fas fa-plus"></i> Добавить одну</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-list"></i> Список машин</div>
+        <div class="search-box">
+          <input id="fleet-search" placeholder="🔍 Поиск..." style="background:rgba(10,14,20,0.8);border:1px solid #1a2430;color:#e8edf5;padding:8px 14px;border-radius:10px;width:100%;max-width:200px;outline:none;font-size:13px;">
+          <select id="fleet-filter-status" style="background:rgba(10,14,20,0.8);border:1px solid #1a2430;color:#e8edf5;padding:8px 14px;border-radius:10px;font-size:13px;">
+            <option value="all">Все</option>
+            <option value="available">Доступные</option>
+            <option value="sold">Проданные</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Модель</th><th>Номер</th><th>Цена покупки</th><th>Статус</th><th>Действия</th></tr></thead>
+          <tbody id="fleet-table-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- PAYMENTS -->
+    <div id="page-payments" class="page">
+      <h1><i class="fas fa-coins"></i> Платежи</h1>
+      <div class="row-stats" id="payment-stats"></div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-plus-circle"></i> Записать платеж по договору</div>
+        <div class="form-grid">
+          <label>Договор (кредит) <select id="p-credit"><option value="">Выберите</option></select></label>
+          <label>Сумма ($) <input id="p-amount" type="number" placeholder="авто"></label>
+          <label>Тип <select id="p-type"><option value="cash">Наличные</option><option value="online">Онлайн</option></select></label>
+          <label>Описание <input id="p-desc" placeholder="Оплата по графику"></label>
+          <label>Дата <input id="p-date" type="date"></label>
+        </div>
+        <button class="btn mt-10" id="add-payment-btn"><i class="fas fa-money-bill-wave"></i> Добавить</button>
+        <p class="text-muted mt-10">* Если сумма не указана, будет оплачен ближайший неоплаченный платёж по графику.</p>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-search"></i> Поиск по платежам</div>
+        <div class="flex">
+          <input id="payment-search" placeholder="🔍 Поиск" style="background:rgba(10,14,20,0.8);border:1px solid #1a2430;color:#e8edf5;padding:8px 14px;border-radius:10px;flex:1;min-width:150px;outline:none;font-size:13px;">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;">Сумма от <input id="payment-min" type="number" placeholder="0" style="width:70px;background:rgba(10,14,20,0.8);border:1px solid #1a2430;color:#e8edf5;padding:4px 8px;border-radius:8px;"></label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;">до <input id="payment-max" type="number" placeholder="99999" style="width:70px;background:rgba(10,14,20,0.8);border:1px solid #1a2430;color:#e8edf5;padding:4px 8px;border-radius:8px;"></label>
+          <button class="btn btn-secondary btn-sm" id="payment-search-btn"><i class="fas fa-filter"></i> Фильтр</button>
+          <button class="btn btn-secondary btn-sm" id="payment-reset-btn"><i class="fas fa-times"></i> Сброс</button>
+        </div>
+        <div class="table-wrap">
+          <table><thead><tr><th>Дата</th><th>Договор</th><th>Клиент</th><th>Сумма</th><th>Тип</th><th>Описание</th><th>Действие</th></tr></thead>
+          <tbody id="payment-table-body"></tbody></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- CREDITS -->
+    <div id="page-credits" class="page">
+      <h1><i class="fas fa-hand-holding-usd"></i> Договоры (кредиты)</h1>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-plus-circle"></i> Создать договор</div>
+        <div class="form-grid">
+          <label>Клиент <select id="cr-client"><option value="">Выберите</option></select></label>
+          <label>Машина <select id="cr-car"><option value="">Выберите</option></select></label>
+          <label>Сумма ($) <input id="cr-amount" type="number" placeholder="22000"></label>
+          <label>Срок (мес) <input id="cr-term" type="number" placeholder="36"></label>
+          <label>Ежемесячный платёж <input id="cr-payment" type="number" placeholder="700"></label>
+        </div>
+        <button class="btn mt-10" id="add-credit-btn"><i class="fas fa-plus"></i> Создать договор</button>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-list"></i> Договоры с графиком платежей</div>
+        <div id="credits-list"></div>
+      </div>
+    </div>
+
+    <!-- SCENARIO -->
+    <div id="page-scenario" class="page">
+      <h1><i class="fas fa-sliders-h"></i> Сценарный планировщик</h1>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-chart-line"></i> Прогноз выручки</div>
+        <div class="form-grid">
+          <label>Цена машины <input id="scenario-price" type="number" value="22000" step="1000"></label>
+          <label>Количество машин <input id="scenario-count" type="number" value="50" step="5"></label>
+          <label>% одобрения <input id="scenario-approval" type="number" value="70" step="5"></label>
+          <label>Срок кредита <input id="scenario-term" type="number" value="36" step="3"></label>
+        </div>
+        <button class="btn mt-10" id="scenario-run-btn"><i class="fas fa-calculator"></i> Рассчитать</button>
+        <div id="scenario-result" class="mt-10" style="background:rgba(10,14,20,0.6);border-radius:14px;padding:16px;display:none;border:1px solid #1a2430;">
+          <div><span class="text-muted">Прогноз выручки через 3 года:</span> <strong id="scenario-revenue" style="font-size:28px;color:#10b981;">$0</strong></div>
+          <div><span class="text-muted">Рост:</span> <strong id="scenario-growth">+0%</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ANALYTICS -->
+    <div id="page-analytics" class="page">
+      <h1><i class="fas fa-chart-line"></i> Аналитика</h1>
+      <div class="row-stats" id="analytics-stats"></div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-robot"></i> Прогноз масштабирования</div>
+        <div id="forecast-container" style="display:flex;flex-wrap:wrap;gap:20px;justify-content:space-around;padding:12px 0;">
+          <div><span class="text-muted">Через 3 мес</span><br><strong id="forecast-3" style="font-size:22px;">—</strong></div>
+          <div><span class="text-muted">Через 6 мес</span><br><strong id="forecast-6" style="font-size:22px;">—</strong></div>
+          <div><span class="text-muted">Через 12 мес</span><br><strong id="forecast-12" style="font-size:22px;">—</strong></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-bolt"></i> Напоминания (Telegram)</div>
+        <button class="btn btn-secondary" id="send-reminders-btn"><i class="fas fa-paper-plane"></i> Отправить тестовые</button>
+        <p class="text-muted mt-10">* Бот напомнит о просрочках.</p>
+      </div>
+    </div>
+
+    <!-- AI ASSISTANT -->
+    <div id="page-assistant" class="page">
+      <h1><i class="fas fa-robot"></i> AI-помощник</h1>
+      <div class="card">
+        <div class="flex" style="margin-bottom:12px;">
+          <i class="fas fa-brain" style="font-size:32px;color:#2f8cf0;filter:drop-shadow(0 0 12px rgba(47,140,240,0.3));"></i>
+          <div><strong style="font-size:18px;">Умный помощник</strong><br><span class="text-muted">Выполняю команды: регистрация, продажа, платежи, кредиты, прогнозы</span></div>
+        </div>
+        <div class="chat-container" id="chat-box">
+          <div class="chat-msg ai"><i class="fas fa-robot"></i> Привет! Я помогу с договорами и платежами. Напиши: "создай договор для клиента 1 на 22000 на 36 мес", "оплати платёж по договору 1", "график по договору 1".</div>
+        </div>
+        <div class="chat-input-row">
+          <input id="chat-input" placeholder="Введите команду...">
+          <button class="btn" id="chat-send-btn"><i class="fas fa-paper-plane"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="page-settings" class="page">
+      <h1><i class="fas fa-cog"></i> Настройки</h1>
+      <div class="card">
+        <div class="card-title"><i class="fas fa-database"></i> Управление данными</div>
+        <div class="flex">
+          <button class="btn btn-secondary" id="export-data"><i class="fas fa-download"></i> Экспорт JSON</button>
+          <button class="btn btn-secondary" id="import-data"><i class="fas fa-upload"></i> Импорт JSON</button>
+          <input type="file" id="import-file" accept=".json" style="display:none;">
+          <button class="btn btn-danger" id="clear-data"><i class="fas fa-trash"></i> Очистить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛКА для редактирования клиента -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <h2><i class="fas fa-user-edit"></i> Редактировать клиента</h2>
+      <div class="form-grid">
+        <label>ФИО <input id="edit-client-name" placeholder="ФИО"></label>
+        <label>Телефон <input id="edit-client-phone" placeholder="Телефон"></label>
+        <label>Telegram ID <input id="edit-client-tg" placeholder="@username"></label>
+        <label>Тип <select id="edit-client-type"><option value="driver">Водитель</option><option value="buyer">Покупатель</option></select></label>
+        <div style="grid-column:1/-1;background:rgba(10,14,20,0.6);border-radius:12px;padding:12px 16px;border:1px solid #1a2430;">
+          <div><span class="text-muted">Долг:</span> <strong id="edit-client-debt">$0.00</strong></div>
+          <div><span class="text-muted">Оплачено:</span> <strong id="edit-client-paid">$0.00</strong></div>
+        </div>
+      </div>
+      <div class="flex mt-10">
+        <button class="btn" id="save-client-edit"><i class="fas fa-save"></i> Сохранить</button>
+        <button class="btn btn-secondary" id="close-modal"><i class="fas fa-times"></i> Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+
+  <script>
+    // =====================================================================
+    // ПОЛНАЯ ЛОГИКА (такая же, как в предыдущей версии, но с анимацией чисел)
+    // =====================================================================
+    const STORAGE_KEY = 'gocab_credits_v2';
+    let data = loadData();
+
+    function defaultData() {
+      return {
+        clients: [],
+        fleet: [],
+        payments: [],
+        credits: [],
+        nextId: { client:1, fleet:1, payment:1, credit:1 }
+      };
+    }
+
+    function loadData() {
+      try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); } catch(e) {}
+      return defaultData();
+    }
+
+    function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+    function nextId(type) { return data.nextId[type]++; }
+
+    // ===== CLIENTS =====
+    function addClient(name, phone, type, tg) {
+      const id = nextId('client');
+      const client = { id, name:name.trim(), phone:phone.trim(), type:type||'buyer', tg:tg?tg.trim():'', createdAt:new Date().toISOString() };
+      data.clients.push(client);
+      saveData();
+      renderAll();
+      showToast(`Клиент ${name} зарегистрирован`, 'success');
+      return client;
+    }
+
+    function deleteClient(id) {
+      if(!confirm('Удалить клиента и все связанные данные?')) return;
+      data.payments = data.payments.filter(p => p.clientId !== id);
+      data.credits = data.credits.filter(c => c.clientId !== id);
+      data.clients = data.clients.filter(c => c.id !== id);
+      saveData();
+      renderAll();
+      showToast('Клиент удалён', 'success');
+    }
+
+    function updateClient(id, name, phone, type, tg) {
+      const client = data.clients.find(c => c.id === id);
+      if (!client) return null;
+      client.name = name.trim();
+      client.phone = phone.trim();
+      client.type = type;
+      client.tg = tg?tg.trim():'';
+      saveData();
+      renderAll();
+      showToast('Клиент обновлён', 'success');
+      return client;
+    }
+
+    function getClientDebt(clientId) {
+      let debt = 0;
+      data.credits.forEach(cr => {
+        if (cr.clientId === clientId && cr.status === 'active') {
+          debt += (cr.amount - cr.paid);
+        }
+      });
+      return debt;
+    }
+
+    function getClientPaid(clientId) {
+      let total = 0;
+      data.payments.forEach(p => {
+        if (p.clientId === clientId) total += p.amount;
+      });
+      return total;
+    }
+
+    // ===== FLEET =====
+    function addFleetItem(model, plate, price, date) {
+      const id = nextId('fleet');
+      const car = { id, model:model.trim(), plate:plate.trim(), purchasePrice:parseFloat(price)||0, purchaseDate:date||new Date().toISOString().slice(0,10), sold:false, salePrice:0, saleDate:null };
+      data.fleet.push(car);
+      saveData();
+      renderAll();
+      showToast(`Машина ${model} (${plate}) добавлена`, 'success');
+      return car;
+    }
+
+    function addFleetBulk(model, count, price, date) {
+      let added = 0;
+      for (let i = 0; i < count; i++) {
+        const plate = `${model.substring(0,3).toUpperCase()}${String(Math.floor(Math.random()*1000)).padStart(3,'0')}`;
+        addFleetItem(model, plate, price, date);
+        added++;
+      }
+      if (added > 0) showToast(`Добавлено ${added} машин модели ${model}`, 'success');
+      return added;
+    }
+
+    function sellFleetItem(id, salePrice) {
+      const car = data.fleet.find(c => c.id === id);
+      if (!car || car.sold) return null;
+      car.sold = true;
+      car.salePrice = parseFloat(salePrice)||0;
+      car.saleDate = new Date().toISOString().slice(0,10);
+      saveData();
+      renderAll();
+      showToast(`Машина ${car.model} продана за $${car.salePrice}`, 'success');
+      return car;
+    }
+
+    function deleteFleet(id) {
+      if(!confirm('Удалить машину?')) return;
+      data.fleet = data.fleet.filter(c => c.id !== id);
+      saveData();
+      renderAll();
+      showToast('Машина удалена','success');
+    }
+
+    function getAvailableFleet() { return data.fleet.filter(c => !c.sold); }
+    function getSoldFleet() { return data.fleet.filter(c => c.sold); }
+
+    // ===== CREDITS =====
+    function addCredit(clientId, carId, amount, term, monthly) {
+      const id = nextId('credit');
+      const schedule = [];
+      const startDate = new Date();
+      for (let i = 1; i <= term; i++) {
+        const d = new Date(startDate);
+        d.setMonth(d.getMonth() + i);
+        const dateStr = d.toISOString().slice(0,10);
+        schedule.push({ date: dateStr, amount: monthly, paid: false });
+      }
+      const credit = {
+        id,
+        clientId: parseInt(clientId),
+        carId: parseInt(carId),
+        amount: parseFloat(amount)||0,
+        term: parseInt(term)||0,
+        monthly: parseFloat(monthly)||0,
+        paid: 0,
+        status: 'active',
+        schedule: schedule,
+        createdAt: new Date().toISOString()
+      };
+      data.credits.push(credit);
+      saveData();
+      renderAll();
+      showToast('Кредитный договор создан с графиком платежей', 'success');
+      return credit;
+    }
+
+    function deleteCredit(id) {
+      if(!confirm('Удалить договор?')) return;
+      data.credits = data.credits.filter(c => c.id !== id);
+      data.payments = data.payments.filter(p => p.creditId !== id);
+      saveData();
+      renderAll();
+      showToast('Договор удалён','success');
+    }
+
+    function getNextUnpaidPayment(creditId) {
+      const credit = data.credits.find(c => c.id === creditId);
+      if (!credit) return null;
+      for (const p of credit.schedule) {
+        if (!p.paid) return p;
+      }
+      return null;
+    }
+
+    // ===== PAYMENTS =====
+    function addPayment(creditId, amount, type, desc, date) {
+      const credit = data.credits.find(c => c.id === parseInt(creditId));
+      if (!credit) { showToast('Договор не найден','error'); return null; }
+
+      let paymentAmount = amount ? parseFloat(amount) : 0;
+      let paidScheduleItem = null;
+      if (!paymentAmount || paymentAmount <= 0) {
+        const next = getNextUnpaidPayment(credit.id);
+        if (next) {
+          paymentAmount = next.amount;
+          paidScheduleItem = next;
+        } else {
+          showToast('Нет неоплаченных платежей по этому договору','error');
+          return null;
+        }
+      } else {
+        for (const p of credit.schedule) {
+          if (!p.paid && Math.abs(p.amount - paymentAmount) < 0.01) {
+            paidScheduleItem = p;
+            break;
+          }
+        }
+        if (!paidScheduleItem) {
+          const next = getNextUnpaidPayment(credit.id);
+          if (next) {
+            paidScheduleItem = next;
+          } else {
+            showToast('Нет неоплаченных платежей','error');
+            return null;
+          }
+        }
+      }
+
+      paidScheduleItem.paid = true;
+      credit.paid += paymentAmount;
+
+      const allPaid = credit.schedule.every(p => p.paid === true);
+      if (allPaid) credit.status = 'inactive';
+
+      const id = nextId('payment');
+      const p = {
+        id,
+        creditId: credit.id,
+        clientId: credit.clientId,
+        amount: paymentAmount,
+        type: type || 'cash',
+        description: desc ? desc.trim() : `Платёж по договору #${credit.id}`,
+        date: date || new Date().toISOString().slice(0,10),
+        scheduleItemDate: paidScheduleItem.date
+      };
+      data.payments.push(p);
+      saveData();
+      renderAll();
+      showToast(`Платеж на $${paymentAmount} по договору #${credit.id} добавлен`, 'success');
+      return p;
+    }
+
+    function deletePayment(id) {
+      if(!confirm('Удалить платеж? Это также отменит оплату по графику.')) return;
+      const payment = data.payments.find(p => p.id === id);
+      if (!payment) return;
+      const credit = data.credits.find(c => c.id === payment.creditId);
+      if (credit) {
+        for (const s of credit.schedule) {
+          if (s.date === payment.scheduleItemDate && Math.abs(s.amount - payment.amount) < 0.01 && s.paid) {
+            s.paid = false;
+            credit.paid -= payment.amount;
+            credit.status = 'active';
+            break;
+          }
+        }
+      }
+      data.payments = data.payments.filter(p => p.id !== id);
+      saveData();
+      renderAll();
+      showToast('Платеж удалён','success');
+    }
+
+    // ===== FINANCE =====
+    function getTotalRevenue() {
+      let revenue = data.payments.reduce((s,p)=>s+p.amount,0);
+      revenue += getSoldFleet().reduce((s,c)=>s+c.salePrice,0);
+      return revenue;
+    }
+
+    function getTotalPurchases() {
+      return data.fleet.reduce((s,c)=>s+c.purchasePrice,0);
+    }
+
+    function getDebt() {
+      let debt = 0;
+      data.credits.forEach(cr => {
+        if (cr.status === 'active') debt += (cr.amount - cr.paid);
+      });
+      return debt;
+    }
+
+    function getProfit() {
+      return getTotalRevenue() - getTotalPurchases();
+    }
+
+    function getProfitByMonth(months=12) {
+      const now = new Date(); const res=[];
+      for (let i=months-1; i>=0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        let income = data.payments.filter(p=>p.date.startsWith(key)).reduce((s,p)=>s+p.amount,0);
+        income += data.fleet.filter(c=>c.sold && c.saleDate && c.saleDate.startsWith(key)).reduce((s,c)=>s+c.salePrice,0);
+        const expenses = data.fleet.filter(c=>c.purchaseDate && c.purchaseDate.startsWith(key)).reduce((s,c)=>s+c.purchasePrice,0);
+        res.push({ month:key, profit:income-expenses });
+      }
+      return res;
+    }
+
+    function getStats() {
+      const totalCars = data.fleet.length;
+      const availableCars = getAvailableFleet().length;
+      const soldCars = getSoldFleet().length;
+      const revenue = getTotalRevenue();
+      const purchases = getTotalPurchases();
+      const debt = getDebt();
+      const profit = revenue - purchases;
+      return {
+        totalClients: data.clients.length,
+        totalCars,
+        availableCars,
+        soldCars,
+        totalPayments: data.payments.length,
+        totalCredits: data.credits.length,
+        revenue,
+        purchases,
+        debt,
+        profit
+      };
+    }
+
+    function forecast(monthsAhead) {
+      const hist = getProfitByMonth(6);
+      const g = getStats();
+      if (hist.length<2) return {
+        cars: g.totalCars + Math.round(g.totalCars*0.1*monthsAhead/3),
+        clients: g.totalClients + Math.round(g.totalClients*0.1*monthsAhead/3),
+        revenue: g.revenue * (1 + 0.08*monthsAhead/3)
+      };
+      const vals = hist.map(m=>m.profit);
+      const avgGrowth = vals.length>1 ? (vals[vals.length-1]-vals[0])/(vals.length-1) : 0;
+      const last = vals[vals.length-1] || g.profit;
+      let carGrowth=0.5, clientGrowth=0.5;
+      const cDates = data.fleet.map(c=>c.purchaseDate).sort();
+      if (cDates.length>1) {
+        const first = new Date(cDates[0]), lastD = new Date(cDates[cDates.length-1]);
+        const months = (lastD.getFullYear()-first.getFullYear())*12 + (lastD.getMonth()-first.getMonth()) + 1;
+        if (months>1) carGrowth = (g.totalCars-1)/months;
+      }
+      const clDates = data.clients.map(c=>c.createdAt).sort();
+      if (clDates.length>1) {
+        const first = new Date(clDates[0]), lastD = new Date(clDates[clDates.length-1]);
+        const months = (lastD.getFullYear()-first.getFullYear())*12 + (lastD.getMonth()-first.getMonth()) + 1;
+        if (months>1) clientGrowth = (g.totalClients-1)/months;
+      }
+      return {
+        cars: Math.max(0, Math.round(g.totalCars + carGrowth*monthsAhead)),
+        clients: Math.max(0, Math.round(g.totalClients + clientGrowth*monthsAhead)),
+        revenue: Math.max(0, g.revenue + avgGrowth*monthsAhead)
+      };
+    }
+
+    // ===== SCENARIO =====
+    function runScenario() {
+      const avgPrice = parseFloat(document.getElementById('scenario-price').value) || 22000;
+      const carCount = parseInt(document.getElementById('scenario-count').value) || 50;
+      const approval = parseFloat(document.getElementById('scenario-approval').value) || 70;
+      const term = parseInt(document.getElementById('scenario-term').value) || 36;
+      const yearlyRevenuePerCar = avgPrice / term * 12;
+      const totalAnnualRevenue = carCount * yearlyRevenuePerCar * (approval / 100);
+      const threeYearRevenue = totalAnnualRevenue * 3;
+      const currentRevenue = getTotalRevenue();
+      const growth = ((threeYearRevenue - currentRevenue) / currentRevenue * 100).toFixed(1);
+      document.getElementById('scenario-revenue').textContent = '$' + threeYearRevenue.toFixed(0);
+      document.getElementById('scenario-growth').textContent = (growth > 0 ? '+' : '') + growth + '%';
+      document.getElementById('scenario-result').style.display = 'block';
+    }
+
+    // ===== REMINDERS =====
+    function sendReminders() {
+      const clientsWithTG = data.clients.filter(c => c.tg && c.tg.length > 0);
+      if (clientsWithTG.length === 0) {
+        showToast('Нет клиентов с Telegram ID', 'error');
+        return;
+      }
+      let count = 0;
+      clientsWithTG.forEach(c => {
+        const debt = getClientDebt(c.id);
+        if (debt > 0) {
+          showToast(`📨 Напоминание для ${c.name} (${c.tg}): остаток долга $${debt.toFixed(2)}`, 'success');
+          count++;
+        }
+      });
+      if (count === 0) showToast('Нет долгов у клиентов с TG', 'error');
+      else showToast(`Отправлено ${count} напоминаний (имитация)`, 'success');
+    }
+
+    // ===== AI ENGINE =====
+    function processAI(query) {
+      const q = query.toLowerCase();
+      const stats = getStats();
+
+      if (q.includes('зарегистрируй клиент') || q.includes('новый клиент')) {
+        const nameMatch = q.match(/клиент[а]?\s+([А-Яа-яA-Za-z\s-]+)/);
+        const phoneMatch = q.match(/\+?[\d\s\-]{8,}/);
+        const tgMatch = q.match(/@[\w]+/);
+        if (nameMatch) {
+          const name = nameMatch[1].trim();
+          const phone = phoneMatch ? phoneMatch[0].trim() : '+7 000 000 00 00';
+          const tg = tgMatch ? tgMatch[0].trim() : '';
+          const type = q.includes('водител') ? 'driver' : 'buyer';
+          addClient(name, phone, type, tg);
+          return `✅ Клиент ${name} зарегистрирован${tg ? ' с TG ' + tg : ''}`;
+        }
+        return '❌ Укажите имя, например: "зарегистрируй клиента Иван Петров, +7 900, @ivan"';
+      }
+
+      if (q.includes('создай договор') || q.includes('кредит')) {
+        const amountMatch = q.match(/(\d+)/);
+        const clientMatch = q.match(/клиент[а]?\s*(?:с id\s*)?(\d+)/i);
+        if (amountMatch && data.clients.length>0 && data.fleet.length>0) {
+          const amount = parseFloat(amountMatch[0]);
+          let clientId = clientMatch ? parseInt(clientMatch[1]) : data.clients[0].id;
+          const client = data.clients.find(c=>c.id===clientId);
+          if (!client) clientId = data.clients[0].id;
+          const car = data.fleet[0];
+          const term = 36;
+          const monthly = Math.round(amount/term);
+          addCredit(clientId, car.id, amount, term, monthly);
+          return `✅ Договор на $${amount} для ${client.name} (машина ${car.model}) создан с графиком на ${term} мес.`;
+        }
+        return '❌ Убедитесь, что есть клиенты и машины. Например: "создай договор для клиента 1 на 22000"';
+      }
+
+      if (q.includes('оплати платёж') || q.includes('оплатить')) {
+        const idMatch = q.match(/(?:договор[а]?\s*)(\d+)/i);
+        const amountMatch = q.match(/(\d+)/);
+        if (idMatch) {
+          const creditId = parseInt(idMatch[0]);
+          const credit = data.credits.find(c => c.id === creditId);
+          if (!credit) return '❌ Договор не найден';
+          const next = getNextUnpaidPayment(creditId);
+          if (!next) return '✅ Все платежи по договору уже оплачены';
+          const amount = amountMatch ? parseFloat(amountMatch[0]) : next.amount;
+          addPayment(creditId, amount, 'cash', 'Оплата через AI');
+          return `💵 Платёж на $${amount} по договору #${creditId} оплачен.`;
+        }
+        return '❌ Укажите номер договора, например: "оплати платёж по договору 1"';
+      }
+
+      if (q.includes('график по договору')) {
+        const idMatch = q.match(/(\d+)/);
+        if (idMatch) {
+          const id = parseInt(idMatch[0]);
+          const credit = data.credits.find(c => c.id === id);
+          if (!credit) return '❌ Договор не найден';
+          let msg = `📅 График договора #${id}:\n`;
+          credit.schedule.forEach((p, idx) => {
+            const status = p.paid ? '✅' : '⏳';
+            msg += `${idx+1}. ${p.date} — $${p.amount} ${status}\n`;
+          });
+          return msg;
+        }
+        return '❌ Укажите номер договора, например: "график по договору 1"';
+      }
+
+      if (q.includes('прогноз')) {
+        const f3=forecast(3), f6=forecast(6), f12=forecast(12);
+        return `🔮 Прогноз AI:<br>• 3 мес: машин ${f3.cars}, клиентов ${f3.clients}, выручка $${f3.revenue.toFixed(0)}<br>• 6 мес: машин ${f6.cars}, клиентов ${f6.clients}, выручка $${f6.revenue.toFixed(0)}<br>• 12 мес: машин ${f12.cars}, клиентов ${f12.clients}, выручка $${f12.revenue.toFixed(0)}`;
+      }
+
+      return `📊 Сейчас: ${stats.totalClients} клиентов, ${stats.totalCars} машин, ${stats.totalCredits} договоров, выручка $${stats.revenue.toFixed(2)}. Напишите "помощь" для списка команд.`;
+    }
+
+    // ===== АНИМАЦИЯ ЧИСЕЛ =====
+    function animateNumber(element, target, duration = 800) {
+      const start = parseFloat(element.textContent.replace(/[^0-9.-]/g, '')) || 0;
+      const diff = target - start;
+      const startTime = performance.now();
+      const isCurrency = element.textContent.includes('$');
+      const prefix = isCurrency ? '$' : '';
+      const suffix = element.textContent.replace(/[0-9.$]/g, '');
+
+      function update(currentTime) {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3); // easeOutCubic
+        const current = start + diff * eased;
+        element.textContent = prefix + current.toFixed(2) + suffix;
+        if (progress < 1) requestAnimationFrame(update);
+        else element.textContent = prefix + target.toFixed(2) + suffix;
+      }
+      requestAnimationFrame(update);
+    }
+
+    // ===== RENDER =====
+    let profitChartInstance = null;
+
+    function renderAll() {
+      renderDashboard();
+      renderClients();
+      renderFleet();
+      renderPayments();
+      renderCredits();
+      renderAnalytics();
+      updateSelects();
+    }
+
+    function renderDashboard() {
+      const s = getStats();
+      document.getElementById('dash-stats').innerHTML = `
+        <div class="stat-card"><div class="label">💰 Выручка</div><div class="value" id="stat-revenue">$${s.revenue.toFixed(2)}</div></div>
+        <div class="stat-card"><div class="label">🚗 Продано</div><div class="value" id="stat-sold">${s.soldCars}</div></div>
+        <div class="stat-card"><div class="label">📦 В наличии</div><div class="value" id="stat-available">${s.availableCars}</div></div>
+        <div class="stat-card"><div class="label">🛒 Куплено</div><div class="value" id="stat-total">${s.totalCars}</div></div>
+        <div class="stat-card"><div class="label">📉 Дебиторка</div><div class="value" id="stat-debt">$${s.debt.toFixed(2)}</div></div>
+        <div class="stat-card ${s.profit>=0?'positive':'negative'}"><div class="label">📈 Прибыль</div><div class="value" id="stat-profit">$${s.profit.toFixed(2)}</div></div>
+      `;
+      // Анимация цифр
+      setTimeout(() => {
+        animateNumber(document.getElementById('stat-revenue'), s.revenue);
+        animateNumber(document.getElementById('stat-sold'), s.soldCars);
+        animateNumber(document.getElementById('stat-available'), s.availableCars);
+        animateNumber(document.getElementById('stat-total'), s.totalCars);
+        animateNumber(document.getElementById('stat-debt'), s.debt);
+        animateNumber(document.getElementById('stat-profit'), s.profit);
+      }, 100);
+      drawProfitChart();
+    }
+
+    function drawProfitChart() {
+      const canvas = document.getElementById('profitChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const dataPoints = getProfitByMonth(12);
+      const labels = dataPoints.map(d=>d.month.slice(5));
+      const values = dataPoints.map(d=>d.profit);
+      if (profitChartInstance) profitChartInstance.destroy();
+      profitChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Прибыль ($)',
+            data: values,
+            backgroundColor: values.map(v=>v>=0?'rgba(16,185,129,0.7)':'rgba(239,68,68,0.7)'),
+            borderColor: values.map(v=>v>=0?'#10b981':'#ef4444'),
+            borderWidth: 2,
+            borderRadius: 6,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: (ctx) => `$${ctx.parsed.y.toFixed(2)}` } }
+          },
+          scales: {
+            y: { beginAtZero: true, grid: { color:'#1a2430' }, ticks: { color:'#8a9bb5' } },
+            x: { grid: { display: false }, ticks: { color:'#8a9bb5' } }
+          }
+        }
+      });
+    }
+
+    function renderClients() {
+      const search = document.getElementById('client-search')?.value?.toLowerCase() || '';
+      const tbody = document.getElementById('client-table-body');
+      tbody.innerHTML = '';
+      const filtered = data.clients.filter(c => c.name.toLowerCase().includes(search) || c.phone.includes(search));
+      if (filtered.length===0) { tbody.innerHTML='<tr><td colspan="7" class="text-muted" style="text-align:center;padding:16px;">Нет клиентов</td></tr>'; return; }
+      filtered.forEach(c => {
+        const debt = getClientDebt(c.id);
+        const paid = getClientPaid(c.id);
+        tbody.innerHTML += `<tr>
+          <td>${c.name}</td>
+          <td>${c.phone}</td>
+          <td>${c.tg||'—'}</td>
+          <td>${c.type}</td>
+          <td>$${debt.toFixed(2)}</td>
+          <td>$${paid.toFixed(2)}</td>
+          <td>
+            <button class="btn btn-secondary btn-sm" onclick="editClient(${c.id})"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-danger btn-sm" onclick="deleteClient(${c.id})"><i class="fas fa-trash"></i></button>
+          </td>
+        </tr>`;
+      });
+    }
+
+    function renderFleet() {
+      const s = getStats();
+      document.getElementById('fleet-stats').innerHTML = `
+        <div class="stat-card"><div class="label">Всего машин</div><div class="value" id="fleet-total">${s.totalCars}</div></div>
+        <div class="stat-card"><div class="label">Доступно</div><div class="value" id="fleet-avail">${s.availableCars}</div></div>
+        <div class="stat-card"><div class="label">Продано</div><div class="value" id="fleet-sold">${s.soldCars}</div></div>
+      `;
+      setTimeout(() => {
+        animateNumber(document.getElementById('fleet-total'), s.totalCars);
+        animateNumber(document.getElementById('fleet-avail'), s.availableCars);
+        animateNumber(document.getElementById('fleet-sold'), s.soldCars);
+      }, 100);
+      const search = document.getElementById('fleet-search')?.value?.toLowerCase() || '';
+      const status = document.getElementById('fleet-filter-status')?.value || 'all';
+      const tbody = document.getElementById('fleet-table-body');
+      tbody.innerHTML = '';
+      let filtered = data.fleet.filter(c => c.model.toLowerCase().includes(search) || c.plate.toLowerCase().includes(search));
+      if (status==='available') filtered = filtered.filter(c=>!c.sold);
+      else if (status==='sold') filtered = filtered.filter(c=>c.sold);
+      if (filtered.length===0) { tbody.innerHTML='<tr><td colspan="5" class="text-muted" style="text-align:center;padding:16px;">Нет машин</td></tr>'; return; }
+      filtered.forEach(c => {
+        const statusText = c.sold ? '💰 Продана' : '✅ Доступна';
+        const statusClass = c.sold ? 'inactive' : 'active';
+        tbody.innerHTML += `<tr><td>${c.model}</td><td>${c.plate}</td><td>$${c.purchasePrice.toFixed(2)}</td><td><span class="badge ${statusClass}">${statusText}</span></td><td>${!c.sold ? `<button class="btn btn-success btn-sm" onclick="sellCar(${c.id})"><i class="fas fa-hand-holding-usd"></i></button>` : `<span class="text-muted">Продана за $${c.salePrice.toFixed(2)}</span>`} <button class="btn btn-danger btn-sm" onclick="deleteFleet(${c.id})"><i class="fas fa-trash"></i></button></td></tr>`;
+      });
+    }
+
+    function renderPayments() {
+      const s = getStats();
+      const totalAmount = data.payments.reduce((sum,p)=>sum+p.amount,0);
+      document.getElementById('payment-stats').innerHTML = `
+        <div class="stat-card"><div class="label">Всего платежей</div><div class="value" id="pay-count">${s.totalPayments}</div></div>
+        <div class="stat-card"><div class="label">Общая сумма</div><div class="value" id="pay-total">$${totalAmount.toFixed(2)}</div></div>
+      `;
+      setTimeout(() => {
+        animateNumber(document.getElementById('pay-count'), s.totalPayments);
+        animateNumber(document.getElementById('pay-total'), totalAmount);
+      }, 100);
+      const search = document.getElementById('payment-search')?.value?.toLowerCase() || '';
+      const minAmount = parseFloat(document.getElementById('payment-min')?.value) || 0;
+      const maxAmount = parseFloat(document.getElementById('payment-max')?.value) || Infinity;
+      const tbody = document.getElementById('payment-table-body');
+      tbody.innerHTML = '';
+      let filtered = data.payments.filter(p => {
+        const client = data.clients.find(c => c.id === p.clientId);
+        const credit = data.credits.find(c => c.id === p.creditId);
+        const clientName = client ? client.name.toLowerCase() : '';
+        const creditLabel = credit ? `#${credit.id}` : '';
+        const desc = p.description.toLowerCase();
+        const matchSearch = clientName.includes(search) || creditLabel.includes(search) || desc.includes(search) || p.date.includes(search);
+        const matchAmount = p.amount >= minAmount && p.amount <= maxAmount;
+        return matchSearch && matchAmount;
+      });
+      filtered.sort((a,b) => b.id - a.id);
+      if (filtered.length===0) { tbody.innerHTML='<tr><td colspan="7" class="text-muted" style="text-align:center;padding:16px;">Нет платежей</td></tr>'; return; }
+      filtered.forEach(p => {
+        const client = data.clients.find(c => c.id === p.clientId);
+        const credit = data.credits.find(c => c.id === p.creditId);
+        tbody.innerHTML += `<tr><td>${p.date}</td><td>${credit ? '#'+credit.id : '—'}</td><td>${client?client.name:'—'}</td><td>$${p.amount.toFixed(2)}</td><td>${p.type==='cash'?'💵 Наличные':'💳 Онлайн'}</td><td>${p.description||'—'}</td><td><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})"><i class="fas fa-trash"></i></button></td></tr>`;
+      });
+    }
+
+    function renderCredits() {
+      const container = document.getElementById('credits-list');
+      container.innerHTML = '';
+      if (data.credits.length === 0) {
+        container.innerHTML = '<div class="text-muted">Нет договоров</div>';
+        return;
+      }
+      data.credits.forEach(cr => {
+        const client = data.clients.find(c => c.id === cr.clientId);
+        const car = data.fleet.find(c => c.id === cr.carId);
+        const remaining = cr.amount - cr.paid;
+        const totalPaid = cr.paid;
+        const paidCount = cr.schedule.filter(p => p.paid).length;
+        const totalCount = cr.schedule.length;
+        const card = document.createElement('div');
+        card.style.cssText = 'background:rgba(10,14,20,0.6);border-radius:14px;padding:16px;margin-bottom:14px;border:1px solid #1a2430;transition:all 0.3s;';
+        card.innerHTML = `
+          <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <div><strong>Договор #${cr.id}</strong> — ${client?client.name:'Клиент удалён'} (${car?car.model:'Машина удалена'})</div>
+            <div><span class="badge ${cr.status==='active'?'active':'inactive'}">${cr.status}</span></div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:16px;margin-top:8px;font-size:13px;">
+            <div>Сумма: <strong>$${cr.amount.toFixed(2)}</strong></div>
+            <div>Остаток: <strong>$${remaining.toFixed(2)}</strong></div>
+            <div>Оплачено: <strong>$${totalPaid.toFixed(2)}</strong></div>
+            <div>Платежей: <strong>${paidCount}/${totalCount}</strong></div>
+          </div>
+          <div class="schedule-grid">
+            ${cr.schedule.map((p, idx) => `
+              <div class="schedule-item">
+                <span class="date">${p.date}</span>
+                <span class="amount">$${p.amount.toFixed(2)}</span>
+                <span class="status-badge ${p.paid?'paid':'unpaid'}">${p.paid?'✅ Оплачен':'⏳ Ожидает'}</span>
+                ${!p.paid ? `<button class="btn btn-success btn-sm" onclick="payScheduleItem(${cr.id}, ${idx})"><i class="fas fa-check"></i></button>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    window.payScheduleItem = function(creditId, index) {
+      const credit = data.credits.find(c => c.id === creditId);
+      if (!credit) return;
+      const scheduleItem = credit.schedule[index];
+      if (!scheduleItem || scheduleItem.paid) return;
+      const amount = scheduleItem.amount;
+      addPayment(creditId, amount, 'cash', `Оплата по графику (${scheduleItem.date})`, new Date().toISOString().slice(0,10));
+    };
+
+    function renderAnalytics() {
+      const s = getStats();
+      document.getElementById('analytics-stats').innerHTML = `
+        <div class="stat-card"><div class="label">Клиентов</div><div class="value" id="ana-clients">${s.totalClients}</div></div>
+        <div class="stat-card"><div class="label">Машин</div><div class="value" id="ana-cars">${s.totalCars}</div></div>
+        <div class="stat-card"><div class="label">Договоров</div><div class="value" id="ana-credits">${s.totalCredits}</div></div>
+        <div class="stat-card ${s.profit>=0?'positive':'negative'}"><div class="label">Прибыль</div><div class="value" id="ana-profit">$${s.profit.toFixed(2)}</div></div>
+      `;
+      setTimeout(() => {
+        animateNumber(document.getElementById('ana-clients'), s.totalClients);
+        animateNumber(document.getElementById('ana-cars'), s.totalCars);
+        animateNumber(document.getElementById('ana-credits'), s.totalCredits);
+        animateNumber(document.getElementById('ana-profit'), s.profit);
+      }, 100);
+      const f3=forecast(3), f6=forecast(6), f12=forecast(12);
+      document.getElementById('forecast-3').innerHTML = `🚗${f3.cars} 👤${f3.clients} 💰$${f3.revenue.toFixed(0)}`;
+      document.getElementById('forecast-6').innerHTML = `🚗${f6.cars} 👤${f6.clients} 💰$${f6.revenue.toFixed(0)}`;
+      document.getElementById('forecast-12').innerHTML = `🚗${f12.cars} 👤${f12.clients} 💰$${f12.revenue.toFixed(0)}`;
+    }
+
+    function updateSelects() {
+      const pCredit = document.getElementById('p-credit');
+      if (pCredit) {
+        const cur = pCredit.value;
+        pCredit.innerHTML = '<option value="">Выберите договор</option>';
+        data.credits.forEach(cr => {
+          const client = data.clients.find(c => c.id === cr.clientId);
+          const car = data.fleet.find(c => c.id === cr.carId);
+          const label = `#${cr.id} — ${client?client.name:'?'} (${car?car.model:'?'})`;
+          pCredit.innerHTML += `<option value="${cr.id}">${label}</option>`;
+        });
+        if (cur) pCredit.value = cur;
+      }
+      const crClient = document.getElementById('cr-client');
+      if (crClient) {
+        const cur = crClient.value;
+        crClient.innerHTML = '<option value="">Выберите</option>';
+        data.clients.forEach(c => {
+          crClient.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
+        if (cur) crClient.value = cur;
+      }
+      const crCar = document.getElementById('cr-car');
+      if (crCar) {
+        const cur = crCar.value;
+        crCar.innerHTML = '<option value="">Выберите</option>';
+        data.fleet.forEach(c => {
+          if (!c.sold) crCar.innerHTML += `<option value="${c.id}">${c.model} (${c.plate})</option>`;
+        });
+        if (cur) crCar.value = cur;
+      }
+    }
+
+    // ===== UI EVENTS =====
+    document.querySelectorAll('.sidebar button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sidebar button').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        const page = btn.dataset.page;
+        document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+        document.getElementById('page-'+page).classList.add('active');
+        if (page==='dashboard') drawProfitChart();
+        if (page==='payments' || page==='credits') updateSelects();
+        if (page==='credits') renderCredits();
+        if (page==='payments') renderPayments();
+        // Перерисовка графиков после появления
+        setTimeout(() => { if (page==='dashboard') drawProfitChart(); }, 100);
+      });
+    });
+
+    // Клиенты
+    document.getElementById('add-client-btn').addEventListener('click', () => {
+      const name = document.getElementById('c-name').value.trim();
+      const phone = document.getElementById('c-phone').value.trim();
+      const tg = document.getElementById('c-tg').value.trim();
+      const type = document.getElementById('c-type').value;
+      if (!name || !phone) { showToast('Заполните имя и телефон','error'); return; }
+      addClient(name, phone, type, tg);
+      document.getElementById('c-name').value=''; document.getElementById('c-phone').value=''; document.getElementById('c-tg').value='';
+    });
+
+    document.getElementById('import-clients-csv').addEventListener('click', () => document.getElementById('client-csv-file').click());
+    document.getElementById('client-csv-file').addEventListener('change', function(e) {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        const lines = ev.target.result.split('\n').filter(l=>l.trim());
+        let count=0;
+        for (const line of lines) {
+          const parts = line.split(',').map(s=>s.trim());
+          if (parts.length>=2) {
+            const [name, phone, type, tg] = parts;
+            if (name && phone) { addClient(name, phone, type||'buyer', tg||''); count++; }
+          }
+        }
+        if (count>0) showToast(`Загружено ${count} клиентов`, 'success');
+        else showToast('Нет корректных данных','error');
+        document.getElementById('client-csv-file').value='';
+      };
+      reader.readAsText(file);
+    });
+
+    let editingClientId = null;
+    window.editClient = function(id) {
+      const client = data.clients.find(c => c.id === id);
+      if (!client) return;
+      editingClientId = id;
+      document.getElementById('edit-client-name').value = client.name;
+      document.getElementById('edit-client-phone').value = client.phone;
+      document.getElementById('edit-client-tg').value = client.tg||'';
+      document.getElementById('edit-client-type').value = client.type;
+      const debt = getClientDebt(id);
+      const paid = getClientPaid(id);
+      document.getElementById('edit-client-debt').textContent = '$' + debt.toFixed(2);
+      document.getElementById('edit-client-paid').textContent = '$' + paid.toFixed(2);
+      document.getElementById('modal-overlay').classList.add('open');
+    };
+
+    document.getElementById('close-modal').addEventListener('click', () => {
+      document.getElementById('modal-overlay').classList.remove('open');
+      editingClientId = null;
+    });
+
+    document.getElementById('save-client-edit').addEventListener('click', () => {
+      if (editingClientId === null) return;
+      const name = document.getElementById('edit-client-name').value.trim();
+      const phone = document.getElementById('edit-client-phone').value.trim();
+      const tg = document.getElementById('edit-client-tg').value.trim();
+      const type = document.getElementById('edit-client-type').value;
+      if (!name || !phone) { showToast('Заполните имя и телефон','error'); return; }
+      updateClient(editingClientId, name, phone, type, tg);
+      document.getElementById('modal-overlay').classList.remove('open');
+      editingClientId = null;
+    });
+
+    document.getElementById('modal-overlay').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('modal-overlay')) {
+        document.getElementById('modal-overlay').classList.remove('open');
+        editingClientId = null;
+      }
+    });
+
+    window.deleteClient = function(id) { deleteClient(id); };
+
+    // Автопарк
+    document.getElementById('add-fleet-bulk-count-btn').addEventListener('click', () => {
+      const model = document.getElementById('f-model-bulk').value.trim();
+      const count = parseInt(document.getElementById('f-count-bulk').value);
+      const price = parseFloat(document.getElementById('f-price-bulk').value);
+      if (!model || isNaN(count) || count <= 0 || isNaN(price) || price <= 0) {
+        showToast('Заполните модель, количество и цену','error');
+        return;
+      }
+      addFleetBulk(model, count, price);
+      document.getElementById('f-model-bulk').value='';
+      document.getElementById('f-count-bulk').value='';
+      document.getElementById('f-price-bulk').value='';
+    });
+
+    document.getElementById('add-fleet-single-btn').addEventListener('click', () => {
+      const model = prompt('Модель:'); if(!model) return;
+      const plate = prompt('Номер:'); if(!plate) return;
+      const price = parseFloat(prompt('Цена покупки ($):')); if(isNaN(price)||price<=0) { showToast('Некорректная цена','error'); return; }
+      const date = prompt('Дата (гггг-мм-дд):', new Date().toISOString().slice(0,10));
+      addFleetItem(model, plate, price, date||new Date().toISOString().slice(0,10));
+    });
+
+    window.sellCar = function(id) {
+      const price = prompt('Цена продажи ($):','20000');
+      if (price===null) return;
+      const val = parseFloat(price);
+      if (isNaN(val)||val<0) { showToast('Некорректная сумма','error'); return; }
+      sellFleetItem(id, val);
+    };
+    window.deleteFleet = function(id) { deleteFleet(id); };
+
+    // Платежи
+    document.getElementById('add-payment-btn').addEventListener('click', () => {
+      const creditId = document.getElementById('p-credit').value;
+      if (!creditId) { showToast('Выберите договор','error'); return; }
+      const amount = parseFloat(document.getElementById('p-amount').value) || 0;
+      const type = document.getElementById('p-type').value;
+      const desc = document.getElementById('p-desc').value.trim();
+      const date = document.getElementById('p-date').value;
+      addPayment(creditId, amount, type, desc, date||new Date().toISOString().slice(0,10));
+      document.getElementById('p-amount').value='';
+      document.getElementById('p-desc').value='';
+      document.getElementById('p-date').value='';
+    });
+
+    document.getElementById('payment-search-btn').addEventListener('click', renderPayments);
+    document.getElementById('payment-reset-btn').addEventListener('click', () => {
+      document.getElementById('payment-search').value = '';
+      document.getElementById('payment-min').value = '';
+      document.getElementById('payment-max').value = '';
+      renderPayments();
+    });
+    window.deletePayment = function(id) { deletePayment(id); };
+
+    // Договоры
+    document.getElementById('add-credit-btn').addEventListener('click', () => {
+      const clientId = document.getElementById('cr-client').value;
+      const carId = document.getElementById('cr-car').value;
+      const amount = parseFloat(document.getElementById('cr-amount').value);
+      const term = parseInt(document.getElementById('cr-term').value);
+      const monthly = parseFloat(document.getElementById('cr-payment').value);
+      if (!clientId || !carId || isNaN(amount) || amount<=0) { showToast('Заполните все поля','error'); return; }
+      addCredit(clientId, carId, amount, term||36, monthly||Math.round(amount/(term||36)));
+      document.getElementById('cr-amount').value='';
+      document.getElementById('cr-term').value='';
+      document.getElementById('cr-payment').value='';
+    });
+
+    // Сценарии
+    document.getElementById('scenario-run-btn').addEventListener('click', runScenario);
+
+    // Напоминания
+    document.getElementById('send-reminders-btn').addEventListener('click', sendReminders);
+
+    // Чат
+    document.getElementById('chat-send-btn').addEventListener('click', sendChat);
+    document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') sendChat(); });
+
+    function sendChat() {
+      const input = document.getElementById('chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+      input.value = '';
+      const chatBox = document.getElementById('chat-box');
+      chatBox.innerHTML += `<div class="chat-msg user">${msg}</div>`;
+      const answer = processAI(msg);
+      chatBox.innerHTML += `<div class="chat-msg ai">${answer}</div>`;
+      chatBox.scrollTop = chatBox.scrollHeight;
+      renderAll();
+    }
+
+    // Настройки
+    document.getElementById('export-data').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `gocab_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+    });
+    document.getElementById('import-data').addEventListener('click', () => document.getElementById('import-file').click());
+    document.getElementById('import-file').addEventListener('change', function(e) {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          const imported = JSON.parse(ev.target.result);
+          if (imported.clients && imported.fleet && imported.payments && imported.credits) {
+            data = imported;
+            if (!data.nextId) data.nextId = { client:1, fleet:1, payment:1, credit:1 };
+            data.credits.forEach(cr => {
+              if (!cr.schedule) {
+                const startDate = new Date(cr.createdAt || new Date());
+                cr.schedule = [];
+                for (let i = 1; i <= cr.term; i++) {
+                  const d = new Date(startDate);
+                  d.setMonth(d.getMonth() + i);
+                  const dateStr = d.toISOString().slice(0,10);
+                  cr.schedule.push({ date: dateStr, amount: cr.monthly, paid: false });
+                }
+                const relatedPayments = data.payments.filter(p => p.creditId === cr.id);
+                relatedPayments.forEach(p => {
+                  for (const s of cr.schedule) {
+                    if (s.date === p.scheduleItemDate && Math.abs(s.amount - p.amount) < 0.01) {
+                      s.paid = true;
+                      cr.paid += p.amount;
+                      break;
+                    }
+                  }
+                });
+                if (cr.schedule.every(p => p.paid)) cr.status = 'inactive';
+              }
+            });
+            saveData();
+            renderAll();
+            showToast('Данные импортированы','success');
+          } else { showToast('Неверный формат','error'); }
+        } catch(err) { showToast('Ошибка импорта','error'); }
+        document.getElementById('import-file').value='';
+      };
+      reader.readAsText(file);
+    });
+    document.getElementById('clear-data').addEventListener('click', () => {
+      if (!confirm('Удалить все данные?')) return;
+      data = defaultData();
+      saveData();
+      renderAll();
+      showToast('Данные очищены','success');
+    });
+
+    function showToast(msg, type='success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `${type==='success'?'✅':'❌'} ${msg}`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    // ===== INIT =====
+    if (data.clients.length===0 && data.fleet.length===0) {
+      addClient('Иван Петров', '+7 900 123 45 67', 'driver', '@ivanpetrov');
+      addClient('Мария Иванова', '+7 901 234 56 78', 'buyer', '@maria');
+      addFleetItem('Toyota Camry', 'A777AA', 22000, '2025-01-15');
+      addFleetItem('Hyundai Sonata', 'B888BB', 18000, '2025-02-20');
+      const credit = addCredit(1, 1, 22000, 36, 700);
+    }
+
+    renderAll();
+    showToast('🚀 GoCab Premium загружен', 'success');
+
+    // Скрыть прелоадер
+    setTimeout(() => {
+      document.getElementById('preloader').classList.add('hide');
+    }, 600);
+
+    window.addEventListener('resize', drawProfitChart);
+  </script>
+</body>
+</html>
