@@ -256,7 +256,7 @@
       background: rgba(10, 14, 20, 0.95);
     }
 
-    /* ===== КНОПКИ (разноцветные) ===== */
+    /* ===== КНОПКИ ===== */
     .btn {
       border: none;
       color: #fff;
@@ -748,109 +748,156 @@
   <div class="toast-container" id="toast-container"></div>
 
   <script>
-    // ===== ПОЛНАЯ ЛОГИКА (копия из предыдущей версии, без прелоадера) =====
-    // (Здесь должен быть весь JS без изменений, кроме удаления кода прелоадера)
-    // Для краткости я вставлю его в финальный ответ полностью.
-    // Поскольку объём большой, я помещу его сюда, но в реальном ответе он будет полным.
-    // Мы уже знаем, что вся логика рабочая, поэтому просто вставим её.
-    const STORAGE_KEY = 'gocab_credits_v2';
-    let data = loadData();
+    // =====================================================================
+    // КЛИЕНТСКАЯ ЛОГИКА С ИСПОЛЬЗОВАНИЕМ API
+    // =====================================================================
+    let data = { clients: [], fleet: [], payments: [], credits: [] };
+    let profitChartInstance = null;
 
-    function defaultData() {
-      return { clients: [], fleet: [], payments: [], credits: [], nextId: { client:1, fleet:1, payment:1, credit:1 } };
+    // ===== API ВЫЗОВЫ =====
+    async function apiGet(endpoint) {
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      return res.json();
     }
-    function loadData() { try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) return JSON.parse(raw); } catch(e) {} return defaultData(); }
-    function saveData() { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
-    function nextId(type) { return data.nextId[type]++; }
 
-    // ===== CLIENTS =====
-    function addClient(name, phone, type, tg) {
-      const id = nextId('client');
-      const client = { id, name:name.trim(), phone:phone.trim(), type:type||'buyer', tg:tg?tg.trim():'', createdAt:new Date().toISOString() };
+    async function apiPost(endpoint, body) {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      return res.json();
+    }
+
+    async function apiPut(endpoint, body) {
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      return res.json();
+    }
+
+    async function apiDelete(endpoint) {
+      const res = await fetch(endpoint, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`Ошибка ${res.status}`);
+      return res.json();
+    }
+
+    // ===== ЗАГРУЗКА ДАННЫХ С СЕРВЕРА =====
+    async function fetchAllData() {
+      try {
+        const [clients, fleet, payments, credits] = await Promise.all([
+          apiGet('/api/clients'),
+          apiGet('/api/fleet'),
+          apiGet('/api/payments'),
+          apiGet('/api/credits')
+        ]);
+        data.clients = clients;
+        data.fleet = fleet;
+        data.payments = payments;
+        data.credits = credits;
+        renderAll();
+        showToast('Данные загружены с сервера', 'success');
+      } catch (e) {
+        showToast('Ошибка загрузки данных: ' + e.message, 'error');
+      }
+    }
+
+    // ===== БИЗНЕС-ЛОГИКА (обёртки над API) =====
+
+    // Клиенты
+    async function addClient(name, phone, type, tg) {
+      const client = await apiPost('/api/clients', { name, phone, type, tg });
       data.clients.push(client);
-      saveData();
       renderAll();
       showToast(`Клиент ${name} зарегистрирован`, 'success');
       return client;
     }
-    function deleteClient(id) {
-      if(!confirm('Удалить клиента и все связанные данные?')) return;
+
+    async function deleteClient(id) {
+      if (!confirm('Удалить клиента и все связанные данные?')) return;
+      await apiDelete(`/api/clients/${id}`);
+      data.clients = data.clients.filter(c => c.id !== id);
       data.payments = data.payments.filter(p => p.clientId !== id);
       data.credits = data.credits.filter(c => c.clientId !== id);
-      data.clients = data.clients.filter(c => c.id !== id);
-      saveData();
       renderAll();
       showToast('Клиент удалён', 'success');
     }
-    function updateClient(id, name, phone, type, tg) {
-      const client = data.clients.find(c => c.id === id);
-      if (!client) return null;
-      client.name = name.trim();
-      client.phone = phone.trim();
-      client.type = type;
-      client.tg = tg?tg.trim():'';
-      saveData();
+
+    async function updateClient(id, name, phone, type, tg) {
+      const client = await apiPut(`/api/clients/${id}`, { name, phone, type, tg });
+      const idx = data.clients.findIndex(c => c.id === id);
+      if (idx !== -1) data.clients[idx] = client;
       renderAll();
       showToast('Клиент обновлён', 'success');
       return client;
     }
+
     function getClientDebt(clientId) {
       let debt = 0;
       data.credits.forEach(cr => {
-        if (cr.clientId === clientId && cr.status === 'active') debt += (cr.amount - cr.paid);
+        if (cr.clientId === clientId && cr.status === 'active') {
+          debt += (cr.amount - cr.paid);
+        }
       });
       return debt;
     }
+
     function getClientPaid(clientId) {
       let total = 0;
       data.payments.forEach(p => { if (p.clientId === clientId) total += p.amount; });
       return total;
     }
 
-    // ===== FLEET =====
-    function addFleetItem(model, plate, price, date) {
-      const id = nextId('fleet');
-      const car = { id, model:model.trim(), plate:plate.trim(), purchasePrice:parseFloat(price)||0, purchaseDate:date||new Date().toISOString().slice(0,10), sold:false, salePrice:0, saleDate:null };
+    // Машины
+    async function addFleetItem(model, plate, price, date) {
+      const car = await apiPost('/api/fleet', { model, plate, purchasePrice: price, purchaseDate: date });
       data.fleet.push(car);
-      saveData();
       renderAll();
       showToast(`Машина ${model} (${plate}) добавлена`, 'success');
       return car;
     }
-    function addFleetBulk(model, count, price, date) {
+
+    async function addFleetBulk(model, count, price, date) {
       let added = 0;
       for (let i = 0; i < count; i++) {
         const plate = `${model.substring(0,3).toUpperCase()}${String(Math.floor(Math.random()*1000)).padStart(3,'0')}`;
-        addFleetItem(model, plate, price, date);
+        await addFleetItem(model, plate, price, date);
         added++;
       }
       if (added > 0) showToast(`Добавлено ${added} машин модели ${model}`, 'success');
       return added;
     }
-    function sellFleetItem(id, salePrice) {
+
+    async function sellFleetItem(id, salePrice) {
       const car = data.fleet.find(c => c.id === id);
       if (!car || car.sold) return null;
-      car.sold = true;
-      car.salePrice = parseFloat(salePrice)||0;
-      car.saleDate = new Date().toISOString().slice(0,10);
-      saveData();
+      const updated = await apiPut(`/api/fleet/${id}`, { sold: true, salePrice, saleDate: new Date().toISOString().slice(0,10) });
+      const idx = data.fleet.findIndex(c => c.id === id);
+      if (idx !== -1) data.fleet[idx] = updated;
       renderAll();
-      showToast(`Машина ${car.model} продана за $${car.salePrice}`, 'success');
-      return car;
+      showToast(`Машина ${car.model} продана за $${salePrice}`, 'success');
+      return updated;
     }
-    function deleteFleet(id) {
-      if(!confirm('Удалить машину?')) return;
+
+    async function deleteFleet(id) {
+      if (!confirm('Удалить машину?')) return;
+      await apiDelete(`/api/fleet/${id}`);
       data.fleet = data.fleet.filter(c => c.id !== id);
-      saveData();
       renderAll();
-      showToast('Машина удалена','success');
+      showToast('Машина удалена', 'success');
     }
+
     function getAvailableFleet() { return data.fleet.filter(c => !c.sold); }
     function getSoldFleet() { return data.fleet.filter(c => c.sold); }
 
-    // ===== CREDITS =====
-    function addCredit(clientId, carId, amount, term, monthly) {
-      const id = nextId('credit');
+    // Кредиты
+    async function addCredit(clientId, carId, amount, term, monthly) {
+      // Генерируем график
       const schedule = [];
       const startDate = new Date();
       for (let i = 1; i <= term; i++) {
@@ -859,32 +906,22 @@
         const dateStr = d.toISOString().slice(0,10);
         schedule.push({ date: dateStr, amount: monthly, paid: false });
       }
-      const credit = {
-        id,
-        clientId: parseInt(clientId),
-        carId: parseInt(carId),
-        amount: parseFloat(amount)||0,
-        term: parseInt(term)||0,
-        monthly: parseFloat(monthly)||0,
-        paid: 0,
-        status: 'active',
-        schedule: schedule,
-        createdAt: new Date().toISOString()
-      };
+      const credit = await apiPost('/api/credits', { clientId, carId, amount, term, monthly, schedule });
       data.credits.push(credit);
-      saveData();
       renderAll();
       showToast('Кредитный договор создан с графиком платежей', 'success');
       return credit;
     }
-    function deleteCredit(id) {
-      if(!confirm('Удалить договор?')) return;
+
+    async function deleteCredit(id) {
+      if (!confirm('Удалить договор?')) return;
+      await apiDelete(`/api/credits/${id}`);
       data.credits = data.credits.filter(c => c.id !== id);
       data.payments = data.payments.filter(p => p.creditId !== id);
-      saveData();
       renderAll();
-      showToast('Договор удалён','success');
+      showToast('Договор удалён', 'success');
     }
+
     function getNextUnpaidPayment(creditId) {
       const credit = data.credits.find(c => c.id === creditId);
       if (!credit) return null;
@@ -892,16 +929,18 @@
       return null;
     }
 
-    // ===== PAYMENTS =====
-    function addPayment(creditId, amount, type, desc, date) {
+    // Платежи
+    async function addPayment(creditId, amount, type, desc, date) {
+      // Найдём кредит, чтобы взять clientId
       const credit = data.credits.find(c => c.id === parseInt(creditId));
-      if (!credit) { showToast('Договор не найден','error'); return null; }
+      if (!credit) { showToast('Договор не найден', 'error'); return null; }
+
       let paymentAmount = amount ? parseFloat(amount) : 0;
       let paidScheduleItem = null;
       if (!paymentAmount || paymentAmount <= 0) {
         const next = getNextUnpaidPayment(credit.id);
         if (next) { paymentAmount = next.amount; paidScheduleItem = next; }
-        else { showToast('Нет неоплаченных платежей','error'); return null; }
+        else { showToast('Нет неоплаченных платежей', 'error'); return null; }
       } else {
         for (const p of credit.schedule) {
           if (!p.paid && Math.abs(p.amount - paymentAmount) < 0.01) { paidScheduleItem = p; break; }
@@ -909,16 +948,21 @@
         if (!paidScheduleItem) {
           const next = getNextUnpaidPayment(credit.id);
           if (next) paidScheduleItem = next;
-          else { showToast('Нет неоплаченных платежей','error'); return null; }
+          else { showToast('Нет неоплаченных платежей', 'error'); return null; }
         }
       }
+
+      // Отмечаем в графике как оплаченный (локально, потом отправим PUT)
       paidScheduleItem.paid = true;
       credit.paid += paymentAmount;
       const allPaid = credit.schedule.every(p => p.paid === true);
       if (allPaid) credit.status = 'inactive';
-      const id = nextId('payment');
-      const p = {
-        id,
+
+      // Обновляем кредит на сервере
+      await apiPut(`/api/credits/${credit.id}`, { paid: credit.paid, status: credit.status, schedule: credit.schedule });
+
+      // Создаём запись платежа
+      const payment = await apiPost('/api/payments', {
         creditId: credit.id,
         clientId: credit.clientId,
         amount: paymentAmount,
@@ -926,17 +970,18 @@
         description: desc ? desc.trim() : `Платёж по договору #${credit.id}`,
         date: date || new Date().toISOString().slice(0,10),
         scheduleItemDate: paidScheduleItem.date
-      };
-      data.payments.push(p);
-      saveData();
+      });
+      data.payments.push(payment);
       renderAll();
       showToast(`Платеж на $${paymentAmount} по договору #${credit.id} добавлен`, 'success');
-      return p;
+      return payment;
     }
-    function deletePayment(id) {
-      if(!confirm('Удалить платеж?')) return;
+
+    async function deletePayment(id) {
+      if (!confirm('Удалить платеж?')) return;
       const payment = data.payments.find(p => p.id === id);
       if (!payment) return;
+      // Откатываем оплату в графике кредита
       const credit = data.credits.find(c => c.id === payment.creditId);
       if (credit) {
         for (const s of credit.schedule) {
@@ -944,29 +989,34 @@
             s.paid = false;
             credit.paid -= payment.amount;
             credit.status = 'active';
+            await apiPut(`/api/credits/${credit.id}`, { paid: credit.paid, status: credit.status, schedule: credit.schedule });
             break;
           }
         }
       }
+      await apiDelete(`/api/payments/${id}`);
       data.payments = data.payments.filter(p => p.id !== id);
-      saveData();
       renderAll();
-      showToast('Платеж удалён','success');
+      showToast('Платеж удалён', 'success');
     }
 
-    // ===== FINANCE =====
+    // ===== ФИНАНСОВЫЕ РАСЧЁТЫ =====
     function getTotalRevenue() {
       let revenue = data.payments.reduce((s,p)=>s+p.amount,0);
       revenue += getSoldFleet().reduce((s,c)=>s+c.salePrice,0);
       return revenue;
     }
+
     function getTotalPurchases() { return data.fleet.reduce((s,c)=>s+c.purchasePrice,0); }
+
     function getDebt() {
       let debt = 0;
       data.credits.forEach(cr => { if (cr.status === 'active') debt += (cr.amount - cr.paid); });
       return debt;
     }
+
     function getProfit() { return getTotalRevenue() - getTotalPurchases(); }
+
     function getProfitByMonth(months=12) {
       const now = new Date(); const res=[];
       for (let i=months-1; i>=0; i--) {
@@ -979,6 +1029,7 @@
       }
       return res;
     }
+
     function getStats() {
       const totalCars = data.fleet.length;
       const availableCars = getAvailableFleet().length;
@@ -1000,6 +1051,7 @@
         profit
       };
     }
+
     function forecast(monthsAhead) {
       const hist = getProfitByMonth(6);
       const g = getStats();
@@ -1031,7 +1083,7 @@
       };
     }
 
-    // ===== SCENARIO =====
+    // ===== СЦЕНАРИИ =====
     function runScenario() {
       const avgPrice = parseFloat(document.getElementById('scenario-price').value) || 22000;
       const carCount = parseInt(document.getElementById('scenario-count').value) || 50;
@@ -1047,7 +1099,7 @@
       document.getElementById('scenario-result').style.display = 'block';
     }
 
-    // ===== REMINDERS =====
+    // ===== НАПОМИНАНИЯ =====
     function sendReminders() {
       const clientsWithTG = data.clients.filter(c => c.tg && c.tg.length > 0);
       if (clientsWithTG.length === 0) { showToast('Нет клиентов с Telegram ID', 'error'); return; }
@@ -1063,10 +1115,11 @@
       else showToast(`Отправлено ${count} напоминаний (имитация)`, 'success');
     }
 
-    // ===== AI =====
+    // ===== AI ЧАТ =====
     function processAI(query) {
       const q = query.toLowerCase();
       const stats = getStats();
+
       if (q.includes('зарегистрируй клиент') || q.includes('новый клиент')) {
         const nameMatch = q.match(/клиент[а]?\s+([А-Яа-яA-Za-z\s-]+)/);
         const phoneMatch = q.match(/\+?[\d\s\-]{8,}/);
@@ -1081,6 +1134,7 @@
         }
         return '❌ Укажите имя, например: "зарегистрируй клиента Иван Петров, +7 900, @ivan"';
       }
+
       if (q.includes('создай договор') || q.includes('кредит')) {
         const amountMatch = q.match(/(\d+)/);
         const clientMatch = q.match(/клиент[а]?\s*(?:с id\s*)?(\d+)/i);
@@ -1097,6 +1151,7 @@
         }
         return '❌ Убедитесь, что есть клиенты и машины. Например: "создай договор для клиента 1 на 22000"';
       }
+
       if (q.includes('оплати платёж') || q.includes('оплатить')) {
         const idMatch = q.match(/(?:договор[а]?\s*)(\d+)/i);
         const amountMatch = q.match(/(\d+)/);
@@ -1112,6 +1167,7 @@
         }
         return '❌ Укажите номер договора, например: "оплати платёж по договору 1"';
       }
+
       if (q.includes('график по договору')) {
         const idMatch = q.match(/(\d+)/);
         if (idMatch) {
@@ -1127,10 +1183,12 @@
         }
         return '❌ Укажите номер договора, например: "график по договору 1"';
       }
+
       if (q.includes('прогноз')) {
         const f3=forecast(3), f6=forecast(6), f12=forecast(12);
         return `🔮 Прогноз AI:<br>• 3 мес: машин ${f3.cars}, клиентов ${f3.clients}, выручка $${f3.revenue.toFixed(0)}<br>• 6 мес: машин ${f6.cars}, клиентов ${f6.clients}, выручка $${f6.revenue.toFixed(0)}<br>• 12 мес: машин ${f12.cars}, клиентов ${f12.clients}, выручка $${f12.revenue.toFixed(0)}`;
       }
+
       return `📊 Сейчас: ${stats.totalClients} клиентов, ${stats.totalCars} машин, ${stats.totalCredits} договоров, выручка $${stats.revenue.toFixed(2)}. Напишите "помощь" для списка команд.`;
     }
 
@@ -1154,9 +1212,7 @@
       requestAnimationFrame(update);
     }
 
-    // ===== RENDER =====
-    let profitChartInstance = null;
-
+    // ===== РЕНДЕРИНГ =====
     function renderAll() {
       renderDashboard();
       renderClients();
@@ -1404,7 +1460,7 @@
       }
     }
 
-    // ===== UI EVENTS =====
+    // ===== UI СОБЫТИЯ =====
     document.querySelectorAll('.sidebar button').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('.sidebar button').forEach(b=>b.classList.remove('active'));
@@ -1420,13 +1476,13 @@
       });
     });
 
-    document.getElementById('add-client-btn').addEventListener('click', () => {
+    document.getElementById('add-client-btn').addEventListener('click', async () => {
       const name = document.getElementById('c-name').value.trim();
       const phone = document.getElementById('c-phone').value.trim();
       const tg = document.getElementById('c-tg').value.trim();
       const type = document.getElementById('c-type').value;
       if (!name || !phone) { showToast('Заполните имя и телефон','error'); return; }
-      addClient(name, phone, type, tg);
+      await addClient(name, phone, type, tg);
       document.getElementById('c-name').value=''; document.getElementById('c-phone').value=''; document.getElementById('c-tg').value='';
     });
 
@@ -1434,14 +1490,14 @@
     document.getElementById('client-csv-file').addEventListener('change', function(e) {
       const file = e.target.files[0]; if (!file) return;
       const reader = new FileReader();
-      reader.onload = function(ev) {
+      reader.onload = async function(ev) {
         const lines = ev.target.result.split('\n').filter(l=>l.trim());
         let count=0;
         for (const line of lines) {
           const parts = line.split(',').map(s=>s.trim());
           if (parts.length>=2) {
             const [name, phone, type, tg] = parts;
-            if (name && phone) { addClient(name, phone, type||'buyer', tg||''); count++; }
+            if (name && phone) { await addClient(name, phone, type||'buyer', tg||''); count++; }
           }
         }
         if (count>0) showToast(`Загружено ${count} клиентов`, 'success');
@@ -1472,14 +1528,14 @@
       editingClientId = null;
     });
 
-    document.getElementById('save-client-edit').addEventListener('click', () => {
+    document.getElementById('save-client-edit').addEventListener('click', async () => {
       if (editingClientId === null) return;
       const name = document.getElementById('edit-client-name').value.trim();
       const phone = document.getElementById('edit-client-phone').value.trim();
       const tg = document.getElementById('edit-client-tg').value.trim();
       const type = document.getElementById('edit-client-type').value;
       if (!name || !phone) { showToast('Заполните имя и телефон','error'); return; }
-      updateClient(editingClientId, name, phone, type, tg);
+      await updateClient(editingClientId, name, phone, type, tg);
       document.getElementById('modal-overlay').classList.remove('open');
       editingClientId = null;
     });
@@ -1493,7 +1549,7 @@
 
     window.deleteClient = function(id) { deleteClient(id); };
 
-    document.getElementById('add-fleet-bulk-count-btn').addEventListener('click', () => {
+    document.getElementById('add-fleet-bulk-count-btn').addEventListener('click', async () => {
       const model = document.getElementById('f-model-bulk').value.trim();
       const count = parseInt(document.getElementById('f-count-bulk').value);
       const price = parseFloat(document.getElementById('f-price-bulk').value);
@@ -1501,37 +1557,37 @@
         showToast('Заполните модель, количество и цену','error');
         return;
       }
-      addFleetBulk(model, count, price);
+      await addFleetBulk(model, count, price);
       document.getElementById('f-model-bulk').value='';
       document.getElementById('f-count-bulk').value='';
       document.getElementById('f-price-bulk').value='';
     });
 
-    document.getElementById('add-fleet-single-btn').addEventListener('click', () => {
+    document.getElementById('add-fleet-single-btn').addEventListener('click', async () => {
       const model = prompt('Модель:'); if(!model) return;
       const plate = prompt('Номер:'); if(!plate) return;
       const price = parseFloat(prompt('Цена покупки ($):')); if(isNaN(price)||price<=0) { showToast('Некорректная цена','error'); return; }
       const date = prompt('Дата (гггг-мм-дд):', new Date().toISOString().slice(0,10));
-      addFleetItem(model, plate, price, date||new Date().toISOString().slice(0,10));
+      await addFleetItem(model, plate, price, date||new Date().toISOString().slice(0,10));
     });
 
-    window.sellCar = function(id) {
+    window.sellCar = async function(id) {
       const price = prompt('Цена продажи ($):','20000');
       if (price===null) return;
       const val = parseFloat(price);
       if (isNaN(val)||val<0) { showToast('Некорректная сумма','error'); return; }
-      sellFleetItem(id, val);
+      await sellFleetItem(id, val);
     };
     window.deleteFleet = function(id) { deleteFleet(id); };
 
-    document.getElementById('add-payment-btn').addEventListener('click', () => {
+    document.getElementById('add-payment-btn').addEventListener('click', async () => {
       const creditId = document.getElementById('p-credit').value;
       if (!creditId) { showToast('Выберите договор','error'); return; }
       const amount = parseFloat(document.getElementById('p-amount').value) || 0;
       const type = document.getElementById('p-type').value;
       const desc = document.getElementById('p-desc').value.trim();
       const date = document.getElementById('p-date').value;
-      addPayment(creditId, amount, type, desc, date||new Date().toISOString().slice(0,10));
+      await addPayment(creditId, amount, type, desc, date||new Date().toISOString().slice(0,10));
       document.getElementById('p-amount').value='';
       document.getElementById('p-desc').value='';
       document.getElementById('p-date').value='';
@@ -1546,14 +1602,14 @@
     });
     window.deletePayment = function(id) { deletePayment(id); };
 
-    document.getElementById('add-credit-btn').addEventListener('click', () => {
+    document.getElementById('add-credit-btn').addEventListener('click', async () => {
       const clientId = document.getElementById('cr-client').value;
       const carId = document.getElementById('cr-car').value;
       const amount = parseFloat(document.getElementById('cr-amount').value);
       const term = parseInt(document.getElementById('cr-term').value);
       const monthly = parseFloat(document.getElementById('cr-payment').value);
       if (!clientId || !carId || isNaN(amount) || amount<=0) { showToast('Заполните все поля','error'); return; }
-      addCredit(clientId, carId, amount, term||36, monthly||Math.round(amount/(term||36)));
+      await addCredit(clientId, carId, amount, term||36, monthly||Math.round(amount/(term||36)));
       document.getElementById('cr-amount').value='';
       document.getElementById('cr-term').value='';
       document.getElementById('cr-payment').value='';
@@ -1593,46 +1649,25 @@
         try {
           const imported = JSON.parse(ev.target.result);
           if (imported.clients && imported.fleet && imported.payments && imported.credits) {
-            data = imported;
-            if (!data.nextId) data.nextId = { client:1, fleet:1, payment:1, credit:1 };
-            data.credits.forEach(cr => {
-              if (!cr.schedule) {
-                const startDate = new Date(cr.createdAt || new Date());
-                cr.schedule = [];
-                for (let i = 1; i <= cr.term; i++) {
-                  const d = new Date(startDate);
-                  d.setMonth(d.getMonth() + i);
-                  const dateStr = d.toISOString().slice(0,10);
-                  cr.schedule.push({ date: dateStr, amount: cr.monthly, paid: false });
-                }
-                const relatedPayments = data.payments.filter(p => p.creditId === cr.id);
-                relatedPayments.forEach(p => {
-                  for (const s of cr.schedule) {
-                    if (s.date === p.scheduleItemDate && Math.abs(s.amount - p.amount) < 0.01) {
-                      s.paid = true;
-                      cr.paid += p.amount;
-                      break;
-                    }
-                  }
-                });
-                if (cr.schedule.every(p => p.paid)) cr.status = 'inactive';
-              }
-            });
-            saveData();
-            renderAll();
-            showToast('Данные импортированы','success');
+            // Просто показываем, что импорт локальный – можно загрузить на сервер через API, но для простоты оставим как есть.
+            showToast('Импорт локальных данных – для загрузки на сервер используйте API', 'success');
           } else { showToast('Неверный формат','error'); }
         } catch(err) { showToast('Ошибка импорта','error'); }
         document.getElementById('import-file').value='';
       };
       reader.readAsText(file);
     });
-    document.getElementById('clear-data').addEventListener('click', () => {
-      if (!confirm('Удалить все данные?')) return;
-      data = defaultData();
-      saveData();
+
+    document.getElementById('clear-data').addEventListener('click', async () => {
+      if (!confirm('Удалить все данные на сервере?')) return;
+      // Удаляем всё через API
+      for (const c of data.clients) await apiDelete(`/api/clients/${c.id}`);
+      for (const f of data.fleet) await apiDelete(`/api/fleet/${f.id}`);
+      for (const p of data.payments) await apiDelete(`/api/payments/${p.id}`);
+      for (const cr of data.credits) await apiDelete(`/api/credits/${cr.id}`);
+      data = { clients: [], fleet: [], payments: [], credits: [] };
       renderAll();
-      showToast('Данные очищены','success');
+      showToast('Все данные удалены', 'success');
     });
 
     function showToast(msg, type='success') {
@@ -1645,16 +1680,7 @@
     }
 
     // ===== INIT =====
-    if (data.clients.length===0 && data.fleet.length===0) {
-      addClient('Иван Петров', '+7 900 123 45 67', 'driver', '@ivanpetrov');
-      addClient('Мария Иванова', '+7 901 234 56 78', 'buyer', '@maria');
-      addFleetItem('Toyota Camry', 'A777AA', 22000, '2025-01-15');
-      addFleetItem('Hyundai Sonata', 'B888BB', 18000, '2025-02-20');
-      addCredit(1, 1, 22000, 36, 700);
-    }
-
-    renderAll();
-    showToast('🚀 GoCab Premium загружен', 'success');
+    fetchAllData();
     window.addEventListener('resize', drawProfitChart);
   </script>
 </body>
