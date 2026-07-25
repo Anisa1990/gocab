@@ -174,7 +174,7 @@
       -webkit-text-fill-color: transparent;
     }
 
-    /* ===== СТАТИСТИКА (разноцветные карточки) ===== */
+    /* ===== СТАТИСТИКА ===== */
     .row-stats {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -222,6 +222,40 @@
     .stat-card.positive .value { background: linear-gradient(135deg, #43e97b, #38f9d7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .stat-card.negative .value { background: linear-gradient(135deg, #f5576c, #fa709a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .stat-card.goal .value { background: linear-gradient(135deg, #f6d365, #fda085); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    /* ===== ГРАФИКИ В РЯД ===== */
+    .charts-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    .chart-card {
+      background: rgba(13, 20, 30, 0.6);
+      backdrop-filter: blur(4px);
+      border-radius: 16px;
+      padding: 16px 18px;
+      border: 1px solid rgba(255,255,255,0.06);
+      transition: all 0.3s;
+    }
+    .chart-card:hover {
+      border-color: rgba(255,255,255,0.12);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    }
+    .chart-card .chart-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #a0b8d0;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .chart-card canvas {
+      max-height: 160px;
+      width: 100% !important;
+    }
 
     /* ===== ФОРМЫ ===== */
     .form-grid {
@@ -496,6 +530,7 @@
       .main { padding: 16px; }
       .row-stats { grid-template-columns: 1fr 1fr; gap: 12px; }
       .stat-card .value { font-size: 24px; }
+      .charts-row { grid-template-columns: 1fr 1fr; }
       .card { padding: 16px; }
       h1 { font-size: 22px; }
       .form-grid { grid-template-columns: 1fr; }
@@ -508,6 +543,7 @@
       .sidebar { width: 52px; padding: 10px 4px; }
       .row-stats { grid-template-columns: 1fr; }
       .stat-card .value { font-size: 22px; }
+      .charts-row { grid-template-columns: 1fr; }
       .main { padding: 12px; }
     }
   </style>
@@ -535,6 +571,24 @@
     <div id="page-dashboard" class="page active">
       <h1><i class="fas fa-chart-pie"></i> Дашборд</h1>
       <div class="row-stats" id="dash-stats"></div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title"><i class="fas fa-car" style="color:#43e97b;"></i> Машины по статусу</div>
+          <canvas id="fleetStatusChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title"><i class="fas fa-coins" style="color:#f6d365;"></i> Платежи по типам</div>
+          <canvas id="paymentTypeChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title"><i class="fas fa-users" style="color:#f093fb;"></i> Клиенты по типам</div>
+          <canvas id="clientTypeChart"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title"><i class="fas fa-hand-holding-usd" style="color:#4facfe;"></i> Кредиты по статусу</div>
+          <canvas id="creditStatusChart"></canvas>
+        </div>
+      </div>
       <div class="card">
         <div class="card-title"><i class="fas fa-calendar-alt"></i> Прибыль по месяцам</div>
         <canvas id="profitChart" height="120"></canvas>
@@ -633,15 +687,18 @@
       </div>
     </div>
 
-    <!-- CREDITS -->
+    <!-- CREDITS (исправлено: ввод данных машины) -->
     <div id="page-credits" class="page">
       <h1><i class="fas fa-hand-holding-usd"></i> Договоры (кредиты)</h1>
       <div class="card">
         <div class="card-title"><i class="fas fa-plus-circle"></i> Создать договор</div>
         <div class="form-grid">
           <label>Клиент <select id="cr-client"><option value="">Выберите</option></select></label>
-          <label>Машина <select id="cr-car"><option value="">Выберите</option></select></label>
-          <label>Сумма ($) <input id="cr-amount" type="number" placeholder="22000"></label>
+          <label>Модель машины <input id="cr-car-model" placeholder="Toyota Camry"></label>
+          <label>Номер машины <input id="cr-car-plate" placeholder="A777AA"></label>
+          <label>Цена покупки ($) <input id="cr-car-price" type="number" placeholder="22000"></label>
+          <label>Дата покупки <input id="cr-car-date" type="date"></label>
+          <label>Сумма кредита ($) <input id="cr-amount" type="number" placeholder="22000"></label>
           <label>Срок (мес) <input id="cr-term" type="number" placeholder="36"></label>
           <label>Ежемесячный платёж <input id="cr-payment" type="number" placeholder="700"></label>
         </div>
@@ -678,11 +735,7 @@
       <div class="row-stats" id="analytics-stats"></div>
       <div class="card">
         <div class="card-title"><i class="fas fa-robot"></i> Прогноз масштабирования</div>
-        <div id="forecast-container" style="display:flex;flex-wrap:wrap;gap:20px;justify-content:space-around;padding:12px 0;">
-          <div><span class="text-muted">Через 3 мес</span><br><strong id="forecast-3" style="font-size:22px;color:#4facfe;">—</strong></div>
-          <div><span class="text-muted">Через 6 мес</span><br><strong id="forecast-6" style="font-size:22px;color:#f093fb;">—</strong></div>
-          <div><span class="text-muted">Через 12 мес</span><br><strong id="forecast-12" style="font-size:22px;color:#43e97b;">—</strong></div>
-        </div>
+        <canvas id="forecastChart" height="120"></canvas>
       </div>
       <div class="card">
         <div class="card-title"><i class="fas fa-bolt"></i> Напоминания (Telegram)</div>
@@ -749,10 +802,10 @@
 
   <script>
     // =====================================================================
-    // КЛИЕНТСКАЯ ЛОГИКА С ИСПОЛЬЗОВАНИЕМ API
+    // ПОЛНАЯ ЛОГИКА С ГРАФИКАМИ (РАБОТАЕТ С API)
     // =====================================================================
     let data = { clients: [], fleet: [], payments: [], credits: [] };
-    let profitChartInstance = null;
+    let chartInstances = {};
 
     // ===== API ВЫЗОВЫ =====
     async function apiGet(endpoint) {
@@ -787,7 +840,7 @@
       return res.json();
     }
 
-    // ===== ЗАГРУЗКА ДАННЫХ С СЕРВЕРА =====
+    // ===== ЗАГРУЗКА ДАННЫХ =====
     async function fetchAllData() {
       try {
         const [clients, fleet, payments, credits] = await Promise.all([
@@ -807,9 +860,7 @@
       }
     }
 
-    // ===== БИЗНЕС-ЛОГИКА (обёртки над API) =====
-
-    // Клиенты
+    // ===== КЛИЕНТЫ =====
     async function addClient(name, phone, type, tg) {
       const client = await apiPost('/api/clients', { name, phone, type, tg });
       data.clients.push(client);
@@ -853,7 +904,7 @@
       return total;
     }
 
-    // Машины
+    // ===== МАШИНЫ =====
     async function addFleetItem(model, plate, price, date) {
       const car = await apiPost('/api/fleet', { model, plate, purchasePrice: price, purchaseDate: date });
       data.fleet.push(car);
@@ -895,9 +946,8 @@
     function getAvailableFleet() { return data.fleet.filter(c => !c.sold); }
     function getSoldFleet() { return data.fleet.filter(c => c.sold); }
 
-    // Кредиты
+    // ===== КРЕДИТЫ (создание с машиной) =====
     async function addCredit(clientId, carId, amount, term, monthly) {
-      // Генерируем график
       const schedule = [];
       const startDate = new Date();
       for (let i = 1; i <= term; i++) {
@@ -929,9 +979,8 @@
       return null;
     }
 
-    // Платежи
+    // ===== ПЛАТЕЖИ =====
     async function addPayment(creditId, amount, type, desc, date) {
-      // Найдём кредит, чтобы взять clientId
       const credit = data.credits.find(c => c.id === parseInt(creditId));
       if (!credit) { showToast('Договор не найден', 'error'); return null; }
 
@@ -952,16 +1001,13 @@
         }
       }
 
-      // Отмечаем в графике как оплаченный (локально, потом отправим PUT)
       paidScheduleItem.paid = true;
       credit.paid += paymentAmount;
       const allPaid = credit.schedule.every(p => p.paid === true);
       if (allPaid) credit.status = 'inactive';
 
-      // Обновляем кредит на сервере
       await apiPut(`/api/credits/${credit.id}`, { paid: credit.paid, status: credit.status, schedule: credit.schedule });
 
-      // Создаём запись платежа
       const payment = await apiPost('/api/payments', {
         creditId: credit.id,
         clientId: credit.clientId,
@@ -981,7 +1027,6 @@
       if (!confirm('Удалить платеж?')) return;
       const payment = data.payments.find(p => p.id === id);
       if (!payment) return;
-      // Откатываем оплату в графике кредита
       const credit = data.credits.find(c => c.id === payment.creditId);
       if (credit) {
         for (const s of credit.schedule) {
@@ -1000,7 +1045,7 @@
       showToast('Платеж удалён', 'success');
     }
 
-    // ===== ФИНАНСОВЫЕ РАСЧЁТЫ =====
+    // ===== ФИНАНСЫ =====
     function getTotalRevenue() {
       let revenue = data.payments.reduce((s,p)=>s+p.amount,0);
       revenue += getSoldFleet().reduce((s,c)=>s+c.salePrice,0);
@@ -1115,7 +1160,7 @@
       else showToast(`Отправлено ${count} напоминаний (имитация)`, 'success');
     }
 
-    // ===== AI ЧАТ =====
+    // ===== AI =====
     function processAI(query) {
       const q = query.toLowerCase();
       const stats = getStats();
@@ -1212,6 +1257,146 @@
       requestAnimationFrame(update);
     }
 
+    // ===== ГРАФИКИ =====
+    function initCharts() {
+      Object.values(chartInstances).forEach(chart => { if (chart) chart.destroy(); });
+      chartInstances = {};
+
+      // 1. Статус машин
+      const fleetCtx = document.getElementById('fleetStatusChart').getContext('2d');
+      const avail = data.fleet.filter(c => !c.sold).length;
+      const sold = data.fleet.filter(c => c.sold).length;
+      chartInstances.fleetStatus = new Chart(fleetCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Доступны', 'Проданы'],
+          datasets: [{ data: [avail, sold], backgroundColor: ['#43e97b', '#f5576c'], borderWidth: 2, borderColor: '#131c26' }]
+        },
+        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: '#c8d6e5', font: { size: 10 } } } }, cutout: '65%' }
+      });
+
+      // 2. Типы платежей
+      const paymentCtx = document.getElementById('paymentTypeChart').getContext('2d');
+      const cash = data.payments.filter(p => p.type === 'cash').reduce((s,p) => s + p.amount, 0);
+      const online = data.payments.filter(p => p.type === 'online').reduce((s,p) => s + p.amount, 0);
+      chartInstances.paymentType = new Chart(paymentCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Наличные', 'Онлайн'],
+          datasets: [{ data: [cash, online], backgroundColor: ['#f6d365', '#4facfe'], borderWidth: 2, borderColor: '#131c26' }]
+        },
+        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: '#c8d6e5', font: { size: 10 } } } }, cutout: '65%' }
+      });
+
+      // 3. Типы клиентов
+      const clientCtx = document.getElementById('clientTypeChart').getContext('2d');
+      const drivers = data.clients.filter(c => c.type === 'driver').length;
+      const buyers = data.clients.filter(c => c.type === 'buyer').length;
+      chartInstances.clientType = new Chart(clientCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Водители', 'Покупатели'],
+          datasets: [{ data: [drivers, buyers], backgroundColor: ['#f093fb', '#f5576c'], borderWidth: 2, borderColor: '#131c26' }]
+        },
+        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: '#c8d6e5', font: { size: 10 } } } }, cutout: '65%' }
+      });
+
+      // 4. Статус кредитов
+      const creditCtx = document.getElementById('creditStatusChart').getContext('2d');
+      const active = data.credits.filter(c => c.status === 'active').length;
+      const closed = data.credits.filter(c => c.status === 'inactive').length;
+      chartInstances.creditStatus = new Chart(creditCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Активные', 'Закрытые'],
+          datasets: [{ data: [active, closed], backgroundColor: ['#43e97b', '#f5576c'], borderWidth: 2, borderColor: '#131c26' }]
+        },
+        options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom', labels: { color: '#c8d6e5', font: { size: 10 } } } }, cutout: '65%' }
+      });
+
+      // 5. Линейный график прибыли
+      drawProfitChart();
+
+      // 6. Прогноз
+      drawForecastChart();
+    }
+
+    function drawProfitChart() {
+      const canvas = document.getElementById('profitChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const dataPoints = getProfitByMonth(12);
+      const labels = dataPoints.map(d=>d.month.slice(5));
+      const values = dataPoints.map(d=>d.profit);
+      if (chartInstances.profit) chartInstances.profit.destroy();
+      chartInstances.profit = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Прибыль ($)',
+            data: values,
+            borderColor: '#4facfe',
+            backgroundColor: 'rgba(79,172,254,0.1)',
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#4facfe',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `$${ctx.parsed.y.toFixed(2)}` } } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: '#1a2430' }, ticks: { color: '#8a9bb5' } },
+            x: { grid: { display: false }, ticks: { color: '#8a9bb5' } }
+          }
+        }
+      });
+    }
+
+    function drawForecastChart() {
+      const canvas = document.getElementById('forecastChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const f3 = forecast(3);
+      const f6 = forecast(6);
+      const f12 = forecast(12);
+      const labels = ['Текущий', '3 мес', '6 мес', '12 мес'];
+      const revenue = [getTotalRevenue(), f3.revenue, f6.revenue, f12.revenue];
+      if (chartInstances.forecast) chartInstances.forecast.destroy();
+      chartInstances.forecast = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Прогноз выручки ($)',
+            data: revenue,
+            borderColor: '#43e97b',
+            backgroundColor: 'rgba(67,233,123,0.1)',
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: '#43e97b',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 5
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `$${ctx.parsed.y.toFixed(0)}` } } },
+          scales: {
+            y: { beginAtZero: true, grid: { color: '#1a2430' }, ticks: { color: '#8a9bb5' } },
+            x: { grid: { display: false }, ticks: { color: '#8a9bb5' } }
+          }
+        }
+      });
+    }
+
     // ===== РЕНДЕРИНГ =====
     function renderAll() {
       renderDashboard();
@@ -1221,6 +1406,7 @@
       renderCredits();
       renderAnalytics();
       updateSelects();
+      setTimeout(initCharts, 200);
     }
 
     function renderDashboard() {
@@ -1241,40 +1427,6 @@
         animateNumber(document.getElementById('stat-debt'), s.debt);
         animateNumber(document.getElementById('stat-profit'), s.profit);
       }, 100);
-      drawProfitChart();
-    }
-
-    function drawProfitChart() {
-      const canvas = document.getElementById('profitChart');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      const dataPoints = getProfitByMonth(12);
-      const labels = dataPoints.map(d=>d.month.slice(5));
-      const values = dataPoints.map(d=>d.profit);
-      if (profitChartInstance) profitChartInstance.destroy();
-      profitChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels,
-          datasets: [{
-            label: 'Прибыль ($)',
-            data: values,
-            backgroundColor: values.map(v=>v>=0?'rgba(67,233,123,0.6)':'rgba(245,87,108,0.6)'),
-            borderColor: values.map(v=>v>=0?'#43e97b':'#f5576c'),
-            borderWidth: 2,
-            borderRadius: 6,
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `$${ctx.parsed.y.toFixed(2)}` } } },
-          scales: {
-            y: { beginAtZero: true, grid: { color:'#1a2430' }, ticks: { color:'#8a9bb5' } },
-            x: { grid: { display: false }, ticks: { color:'#8a9bb5' } }
-          }
-        }
-      });
     }
 
     function renderClients() {
@@ -1425,13 +1577,10 @@
         animateNumber(document.getElementById('ana-credits'), s.totalCredits);
         animateNumber(document.getElementById('ana-profit'), s.profit);
       }, 100);
-      const f3=forecast(3), f6=forecast(6), f12=forecast(12);
-      document.getElementById('forecast-3').innerHTML = `🚗${f3.cars} 👤${f3.clients} 💰$${f3.revenue.toFixed(0)}`;
-      document.getElementById('forecast-6').innerHTML = `🚗${f6.cars} 👤${f6.clients} 💰$${f6.revenue.toFixed(0)}`;
-      document.getElementById('forecast-12').innerHTML = `🚗${f12.cars} 👤${f12.clients} 💰$${f12.revenue.toFixed(0)}`;
     }
 
     function updateSelects() {
+      // Для платежей – выбираем договор
       const pCredit = document.getElementById('p-credit');
       if (pCredit) {
         const cur = pCredit.value;
@@ -1444,19 +1593,15 @@
         });
         if (cur) pCredit.value = cur;
       }
+      // Для договоров – выбираем клиента (машина вводится вручную)
       const crClient = document.getElementById('cr-client');
       if (crClient) {
         const cur = crClient.value;
-        crClient.innerHTML = '<option value="">Выберите</option>';
-        data.clients.forEach(c => { crClient.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
+        crClient.innerHTML = '<option value="">Выберите клиента</option>';
+        data.clients.forEach(c => {
+          crClient.innerHTML += `<option value="${c.id}">${c.name}</option>`;
+        });
         if (cur) crClient.value = cur;
-      }
-      const crCar = document.getElementById('cr-car');
-      if (crCar) {
-        const cur = crCar.value;
-        crCar.innerHTML = '<option value="">Выберите</option>';
-        data.fleet.forEach(c => { if (!c.sold) crCar.innerHTML += `<option value="${c.id}">${c.model} (${c.plate})</option>`; });
-        if (cur) crCar.value = cur;
       }
     }
 
@@ -1468,14 +1613,15 @@
         const page = btn.dataset.page;
         document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
         document.getElementById('page-'+page).classList.add('active');
-        if (page==='dashboard') drawProfitChart();
-        if (page==='payments' || page==='credits') updateSelects();
-        if (page==='credits') renderCredits();
-        if (page==='payments') renderPayments();
-        setTimeout(() => { if (page==='dashboard') drawProfitChart(); }, 100);
+        if (page === 'dashboard') setTimeout(initCharts, 100);
+        if (page === 'analytics') setTimeout(initCharts, 100);
+        if (page === 'payments' || page === 'credits') updateSelects();
+        if (page === 'credits') renderCredits();
+        if (page === 'payments') renderPayments();
       });
     });
 
+    // Клиенты
     document.getElementById('add-client-btn').addEventListener('click', async () => {
       const name = document.getElementById('c-name').value.trim();
       const phone = document.getElementById('c-phone').value.trim();
@@ -1549,6 +1695,7 @@
 
     window.deleteClient = function(id) { deleteClient(id); };
 
+    // Автопарк
     document.getElementById('add-fleet-bulk-count-btn').addEventListener('click', async () => {
       const model = document.getElementById('f-model-bulk').value.trim();
       const count = parseInt(document.getElementById('f-count-bulk').value);
@@ -1580,6 +1727,7 @@
     };
     window.deleteFleet = function(id) { deleteFleet(id); };
 
+    // Платежи
     document.getElementById('add-payment-btn').addEventListener('click', async () => {
       const creditId = document.getElementById('p-credit').value;
       if (!creditId) { showToast('Выберите договор','error'); return; }
@@ -1602,22 +1750,50 @@
     });
     window.deletePayment = function(id) { deletePayment(id); };
 
+    // Договоры (создание с машиной)
     document.getElementById('add-credit-btn').addEventListener('click', async () => {
       const clientId = document.getElementById('cr-client').value;
-      const carId = document.getElementById('cr-car').value;
+      const model = document.getElementById('cr-car-model').value.trim();
+      const plate = document.getElementById('cr-car-plate').value.trim();
+      const carPrice = parseFloat(document.getElementById('cr-car-price').value);
+      const carDate = document.getElementById('cr-car-date').value;
       const amount = parseFloat(document.getElementById('cr-amount').value);
       const term = parseInt(document.getElementById('cr-term').value);
       const monthly = parseFloat(document.getElementById('cr-payment').value);
-      if (!clientId || !carId || isNaN(amount) || amount<=0) { showToast('Заполните все поля','error'); return; }
-      await addCredit(clientId, carId, amount, term||36, monthly||Math.round(amount/(term||36)));
-      document.getElementById('cr-amount').value='';
-      document.getElementById('cr-term').value='';
-      document.getElementById('cr-payment').value='';
+
+      if (!clientId || !model || !plate || isNaN(carPrice) || carPrice <= 0 || isNaN(amount) || amount <= 0) {
+        showToast('Заполните все поля корректно (клиент, модель, номер, цена, сумма кредита)', 'error');
+        return;
+      }
+
+      try {
+        // 1. Создаём машину
+        const car = await addFleetItem(model, plate, carPrice, carDate || new Date().toISOString().slice(0,10));
+        // 2. Создаём кредит
+        await addCredit(clientId, car.id, amount, term || 36, monthly || Math.round(amount / (term || 36)));
+        // Очищаем поля
+        document.getElementById('cr-car-model').value = '';
+        document.getElementById('cr-car-plate').value = '';
+        document.getElementById('cr-car-price').value = '';
+        document.getElementById('cr-car-date').value = '';
+        document.getElementById('cr-amount').value = '';
+        document.getElementById('cr-term').value = '';
+        document.getElementById('cr-payment').value = '';
+        updateSelects();
+        renderCredits();
+        showToast(`Договор создан, машина ${model} добавлена в автопарк`, 'success');
+      } catch (e) {
+        showToast('Ошибка: ' + e.message, 'error');
+      }
     });
 
+    // Сценарии
     document.getElementById('scenario-run-btn').addEventListener('click', runScenario);
+
+    // Напоминания
     document.getElementById('send-reminders-btn').addEventListener('click', sendReminders);
 
+    // Чат
     document.getElementById('chat-send-btn').addEventListener('click', sendChat);
     document.getElementById('chat-input').addEventListener('keypress', e => { if(e.key==='Enter') sendChat(); });
 
@@ -1634,6 +1810,7 @@
       renderAll();
     }
 
+    // Настройки
     document.getElementById('export-data').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(data,null,2)], {type:'application/json'});
       const a = document.createElement('a');
@@ -1649,8 +1826,7 @@
         try {
           const imported = JSON.parse(ev.target.result);
           if (imported.clients && imported.fleet && imported.payments && imported.credits) {
-            // Просто показываем, что импорт локальный – можно загрузить на сервер через API, но для простоты оставим как есть.
-            showToast('Импорт локальных данных – для загрузки на сервер используйте API', 'success');
+            showToast('Импорт локальный – для загрузки на сервер используйте API', 'success');
           } else { showToast('Неверный формат','error'); }
         } catch(err) { showToast('Ошибка импорта','error'); }
         document.getElementById('import-file').value='';
@@ -1660,7 +1836,6 @@
 
     document.getElementById('clear-data').addEventListener('click', async () => {
       if (!confirm('Удалить все данные на сервере?')) return;
-      // Удаляем всё через API
       for (const c of data.clients) await apiDelete(`/api/clients/${c.id}`);
       for (const f of data.fleet) await apiDelete(`/api/fleet/${f.id}`);
       for (const p of data.payments) await apiDelete(`/api/payments/${p.id}`);
@@ -1681,7 +1856,11 @@
 
     // ===== INIT =====
     fetchAllData();
-    window.addEventListener('resize', drawProfitChart);
+    window.addEventListener('resize', () => {
+      if (document.getElementById('page-dashboard').classList.contains('active')) {
+        setTimeout(initCharts, 200);
+      }
+    });
   </script>
 </body>
 </html>
